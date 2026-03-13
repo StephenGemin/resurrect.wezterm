@@ -109,8 +109,31 @@ local function insert_panes(root, panes)
 			-- only saving local scrollback because it would slow down the process
 			-- See: https://github.com/MLFlexer/resurrect.wezterm/issues/41
 			root.alt_screen_active = root.pane:is_alt_screen_active()
-			if root.alt_screen_active then
-				local process_info = root.pane:get_foreground_process_info()
+
+			local process_info = root.pane:get_foreground_process_info()
+			local has_handler = process_handlers.find_handler(process_info)
+
+			-- If the foreground process doesn't match a handler, check the
+			-- pane-session file. When Claude Code runs a child process (bash,
+			-- node, etc.), that child becomes the foreground process and
+			-- find_handler misses Claude Code. The pane-session file written
+			-- by Claude Code's SessionStart hook is the reliable signal.
+			if not has_handler then
+				local pane_session = process_handlers.read_pane_session(root.pane:pane_id())
+				if pane_session and pane_session.session_id then
+					has_handler = true
+					-- Build synthetic process_info since the foreground
+					-- process is a child (bash, etc.), not claude itself.
+					process_info = {
+						name = "claude",
+						executable = "claude",
+						argv = {},
+						cwd = process_info.cwd or "",
+					}
+				end
+			end
+
+			if root.alt_screen_active or has_handler then
 				process_info.children = nil
 				process_info.pid = nil
 				process_info.ppid = nil
