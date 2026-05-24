@@ -1,3 +1,8 @@
+> [!WARNING]
+> This project is archived and no longer maintained. 
+> I'm currently focusing on my PhD and don't find it interesting to work on this anymore. 
+> Please fork/use one of the forks instead 😃
+
 # resurrect.wezterm
 
 Resurrect your terminal environment!⚰️ A plugin to save the state of your windows, tabs and panes. Inspired by [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) and [tmux-continuum](https://github.com/tmux-plugins/tmux-continuum).
