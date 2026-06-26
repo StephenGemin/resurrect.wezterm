@@ -1,0 +1,8 @@
+return {
+	default = {
+		-- Make the plugin sources and the spec helpers importable.
+		lpath = "./plugin/?.lua;./spec/?.lua",
+		pattern = "_spec",
+		ROOT = { "spec" },
+	},
+}

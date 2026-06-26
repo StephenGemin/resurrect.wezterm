@@ -60,13 +60,44 @@ stylua --check plugin/          # formatting
 luacheck plugin/                # linting
 lua-language-server --check plugin/ --logpath /tmp/lua-ls-log  # type / nil checks
 
+# Unit tests (CI runs these on every PR)
+busted                          # runs everything under spec/ (needs Lua 5.4 + busted)
+
 # Manual smoke test inside Wezterm
 # Add the plugin to your wezterm.lua, then use the save/load keybindings
 # described in README.md and verify state round-trips correctly.
 ```
 
-CI (`.github/workflows/ci.yml`) must stay green: stylua, luacheck, and lua-ls run on
-every PR and on every push to an open PR.
+CI (`.github/workflows/ci.yml`) has two jobs that must stay green on every PR and on
+every push to an open PR:
+
+- `lint` — stylua, luacheck, and lua-ls over `plugin/`.
+- `test` — the busted unit suite under `spec/`.
+
+### Unit tests (`spec/`)
+
+The suite targets the **user-facing contract documented in README.md** — the public
+API names a user's `wezterm.lua` calls, and the documented default behaviours — so a
+refactor that silently breaks a user's config fails CI instead. It is deliberately
+small and behaviour-focused, not a coverage exercise.
+
+The plugin modules `require("wezterm")` and reach into `wezterm.mux` / `gui` at load
+time, so they cannot be required directly under plain Lua. `spec/spec_helper.lua`
+installs a controllable `wezterm` mock and (re)loads a module against it; specs assert
+on recorded side effects (emitted events, mux/timer calls). When you add a module that
+touches a new `wezterm.*` field, extend the mock in `spec/spec_helper.lua`.
+
+Current specs:
+
+- `api_surface_spec.lua` — every `resurrect.*` function the README references exists,
+  and `init.lua` exports the submodules under the documented names.
+- `save_state_spec.lua` — state-shape → file type / path routing and `opt_name`.
+- `load_state_spec.lua` — returns the parsed table, or `{}` (never nil) on a bad file.
+- `restore_workspace_spec.lua` — the `spawn_in_workspace` / `switch_workspace` default
+  matrix flagged as a breaking change in README.
+- `periodic_save_spec.lua` — the documented 15-minute default and that it saves.
+
+Run a single file with `busted spec/save_state_spec.lua`.
 
 ## Code style
 
