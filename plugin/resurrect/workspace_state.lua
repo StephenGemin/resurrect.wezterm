@@ -16,6 +16,13 @@ function pub.restore_workspace(workspace_state, opts)
 		opts = {}
 	end
 
+	-- Default to restoring the windows into (and switching to) the saved
+	-- workspace. Pass `spawn_in_workspace = false` to keep the legacy behaviour of
+	-- spawning them into the "default" workspace without switching.
+	if opts.spawn_in_workspace == nil then
+		opts.spawn_in_workspace = true
+	end
+
 	for i, window_state in ipairs(workspace_state.window_states) do
 		if i == 1 and opts.window then
 			-- inner size is in pixels

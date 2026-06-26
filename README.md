@@ -84,10 +84,9 @@ config.keys = {
         }
         if type == "workspace" then
           local state = resurrect.state_manager.load_state(id, "workspace")
-          -- `spawn_in_workspace` restores the windows into the saved workspace and
-          -- switches you to it. Without it the windows land in the "default"
-          -- workspace instead of the one you selected.
-          opts.spawn_in_workspace = true
+          -- Restores the windows into the saved workspace and switches you to it.
+          -- This is the default; pass `spawn_in_workspace = false` to instead spawn
+          -- them into the "default" workspace without switching.
           resurrect.workspace_state.restore_workspace(state, opts)
         elseif type == "window" then
           local state = resurrect.state_manager.load_state(id, "window")
@@ -253,7 +252,7 @@ which will rename the file to the name of the string.
 Options for restoring state:
 
 ```lua
-{spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace instead of the "default" workspace
+{spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace; default: true. Set false to spawn into the "default" workspace
 switch_workspace: boolean?, -- Switch the active workspace to the restored one; defaults to the value of spawn_in_workspace
 relative: boolean?, -- Use relative size when restoring panes
 absolute: boolean?, -- Use absolute size when restoring panes
@@ -267,13 +266,18 @@ on_pane_restore: fun(pane_tree: pane_tree)} -- Function to restore panes, use re
 ```
 
 > [!NOTE]
-> `spawn_in_workspace` defaults to `false` for backwards compatibility. When it is
-> `false` (or omitted), the restored windows are spawned into Wezterm's `"default"`
-> workspace rather than the saved one, and the active workspace is **not** changed —
-> so you stay where you are and the restored windows appear under `"default"`.
-> Set `spawn_in_workspace = true` to restore the windows into the saved workspace and
-> switch to it. By default `switch_workspace` follows `spawn_in_workspace`; set it
+> `spawn_in_workspace` defaults to `true`: the restored windows are spawned into the
+> saved workspace and the active workspace is switched to it. Set
+> `spawn_in_workspace = false` to keep the legacy behaviour, where the windows are
+> spawned into Wezterm's `"default"` workspace and the active workspace is **not**
+> changed — so you stay where you are and the restored windows appear under
+> `"default"`. By default `switch_workspace` follows `spawn_in_workspace`; set it
 > explicitly to switch (or not) independently of where the windows are spawned.
+
+> [!WARNING]
+> The `spawn_in_workspace = true` default is a breaking change from earlier versions,
+> which defaulted to `false`. If you relied on restored windows landing in the
+> `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
 
 #### Windows not resizing correctly
 
