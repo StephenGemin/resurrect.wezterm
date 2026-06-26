@@ -38,9 +38,12 @@ package.path = table.concat(search_paths, ";") .. ";" .. package.path
 local state_manager = require("resurrect.state_manager")
 
 local sep = is_windows() and "\\" or "/"
-local base = is_windows()
-  and ((os.getenv("TEMP") or os.getenv("TMP") or "C:\\Temp") .. "\\resurrect_sm_test")
+-- save_state_dir carries a trailing separator by convention (set that way in
+-- init.lua and relied on by delete_state), so base ends with `sep` here too.
+local base = (
+  is_windows() and ((os.getenv("TEMP") or os.getenv("TMP") or "C:\\Temp") .. "\\resurrect_sm_test")
   or "/tmp/resurrect_sm_test"
+) .. sep
 
 -- get_file_path is a local function and cannot be called directly.
 -- These tests exercise it via load_state(), which passes its return value
@@ -51,20 +54,20 @@ describe("state_manager path construction (via load_state)", function()
     state_manager.save_state_dir = base
   end)
 
-  it("separates save_state_dir and type with a path separator", function()
+  it("builds <save_state_dir><type>/<name>.json without doubling the separator", function()
     state_manager.load_state("myworkspace", "workspace")
-    assert.equals(base .. sep .. "workspace" .. sep .. "myworkspace.json", last_load_path)
+    assert.equals(base .. "workspace" .. sep .. "myworkspace.json", last_load_path)
   end)
 
   it("replaces path separator characters in file names with +", function()
     state_manager.load_state("foo" .. sep .. "bar", "workspace")
-    assert.equals(base .. sep .. "workspace" .. sep .. "foo+bar.json", last_load_path)
+    assert.equals(base .. "workspace" .. sep .. "foo+bar.json", last_load_path)
   end)
 
   it("replaces reserved characters : [ ] ? / in file names with +", function()
     state_manager.load_state("name:with[reserved]chars?and/slashes", "window")
     assert.equals(
-      base .. sep .. "window" .. sep .. "name+with+reserved+chars+and+slashes.json",
+      base .. "window" .. sep .. "name+with+reserved+chars+and+slashes.json",
       last_load_path
     )
   end)
