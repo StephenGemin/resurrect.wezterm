@@ -59,8 +59,15 @@ function pub.restore_workspace(workspace_state, opts)
 	if should_switch == nil then
 		should_switch = opts.spawn_in_workspace
 	end
-	if should_switch and workspace_state.workspace and workspace_state.workspace ~= "" then
-		wezterm.mux.set_active_workspace(workspace_state.workspace)
+	if workspace_state.workspace and workspace_state.workspace ~= "" then
+		if should_switch then
+			wezterm.mux.set_active_workspace(workspace_state.workspace)
+		else
+			-- Not switching (legacy `spawn_in_workspace = false`): keep the user in
+			-- their current workspace but rename it to the restored name, so it no
+			-- longer shows up as "default".
+			wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), workspace_state.workspace)
+		end
 	end
 
 	wezterm.emit("resurrect.workspace_state.restore_workspace.finished")
