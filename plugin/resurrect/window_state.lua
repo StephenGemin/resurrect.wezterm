@@ -1,44 +1,56 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local tab_state_mod = require("resurrect.tab_state")
-
 local pub = {}
 
----@param tab MuxTab
+---Returns the state of the window
+---@param window MuxWindow
+---@return window_state
+function pub.get_window_state(window)
+	local window_state = {
+		title = window:get_title(),
+		tabs = {},
+	}
+
+	local tabs = window:tabs_with_info()
+
+	for i, tab in ipairs(tabs) do
+		local tab_state = tab_state_mod.get_tab_state(tab.tab)
+		tab_state.is_active = tab.is_active
+		window_state.tabs[i] = tab_state
+	end
+
+	window_state.size = tabs[1].tab:get_size()
+
+	return window_state
+end
+
+---Force closes all other tabs in the window but one
+---@param window MuxWindow
 ---@param tab_to_keep MuxTab
 local function close_all_other_tabs(window, tab_to_keep)
-	for _, t in ipairs(window:tabs()) do
-		if t:tab_id() ~= tab_to_keep:tab_id() then
-			t:activate()
-			wezterm.sleep_ms(100)
-			window:perform_action(wezterm.action.CloseCurrentTab({ confirm = false }), t:active_pane())
+	for _, tab in ipairs(window:tabs()) do
+		if tab:tab_id() ~= tab_to_keep:tab_id() then
+			tab:activate()
+			window
+				:gui_window()
+				:perform_action(wezterm.action.CloseCurrentTab({ confirm = false }), window:active_pane())
 		end
 	end
 end
 
----@param window MuxWindow
----@return window_state
-function pub.get_window_state(window)
-	local tabs = {}
-	for _, tab in ipairs(window:tabs()) do
-		table.insert(tabs, tab_state_mod.get_tab_state(tab))
-	end
-	local window_state = {
-		title = window:get_title(),
-		tabs = tabs,
-		size = window:active_tab():get_size(),
-	}
-	return window_state
-end
-
+---restore window state
 ---@param window MuxWindow
 ---@param window_state window_state
 ---@param opts? restore_opts
 function pub.restore_window(window, window_state, opts)
+	wezterm.emit("resurrect.window_state.restore_window.start")
 	if opts == nil then
 		opts = {}
 	end
 
-	window:set_title(window_state.title)
+	if window_state.title then
+		window:set_title(window_state.title)
+	end
 
 	local active_tab
 	for i, tab_state in ipairs(window_state.tabs) do
@@ -58,41 +70,40 @@ function pub.restore_window(window, window_state, opts)
 		end
 
 		tab_state_mod.restore_tab(tab, tab_state, opts)
-
-		if tab_state.is_zoomed then
-			tab:active_pane():toggle_zoom()
-		end
-
 		if tab_state.is_active then
 			active_tab = tab
 		end
+
+		if tab_state.is_zoomed then
+			tab:set_zoomed(true)
+		end
 	end
 
-	if active_tab then
-		active_tab:activate()
-	end
+	active_tab:activate()
+	wezterm.emit("resurrect.window_state.restore_window.finished")
 end
 
----@return Action
 function pub.save_window_action()
-	return wezterm.action_callback(function(window, _)
-		local mux_window = window:mux_window()
-		local title = mux_window:get_title()
-		if title == nil or title == "" then
-			window:perform_action(
+	return wezterm.action_callback(function(win, pane)
+		local resurrect = require("resurrect")
+		local mux_win = win:mux_window()
+		if mux_win:get_title() == "" then
+			win:perform_action(
 				wezterm.action.PromptInputLine({
-					description = "Enter window title",
-					action = wezterm.action_callback(function(_, _, line)
-						if line then
-							mux_window:set_title(line)
-							require("resurrect.state_manager").save_state(pub.get_window_state(mux_window))
+					description = "Enter new window title",
+					action = wezterm.action_callback(function(window, _, title)
+						if title then
+							window:mux_window():set_title(title)
+							local state = pub.get_window_state(mux_win)
+							resurrect.save_state(state)
 						end
 					end),
 				}),
-				window:active_pane()
+				pane
 			)
-		else
-			require("resurrect.state_manager").save_state(pub.get_window_state(mux_window))
+		elseif mux_win:get_title() then
+			local state = pub.get_window_state(mux_win)
+			resurrect.save_state(state)
 		end
 	end)
 end
