@@ -1,6 +1,5 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local utils = require("resurrect.utils")
-local file_io = require("resurrect.file_io")
 local pub = {}
 
 ---@alias fmt_fun fun(label: string): string
@@ -84,7 +83,9 @@ local function find_json_files_recursive(base_path)
 		success, stdout, stderr = wezterm.run_child_process({
 			"sh",
 			"-c",
-			'find "' .. base_path:gsub('"', '\\"') .. '" -type f -name "*.json" -printf "%T@ %p\\n" | awk \'{split($1, a, "."); print a[1], $2}\'',
+			'find "'
+				.. base_path:gsub('"', '\\"')
+				.. '" -type f -name "*.json" -printf "%T@ %p\\n" | awk \'{split($1, a, "."); print a[1], $2}\'',
 		})
 	end
 

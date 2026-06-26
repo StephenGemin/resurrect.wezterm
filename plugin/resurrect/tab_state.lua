@@ -152,12 +152,20 @@ end
 -- Process names not in this set will be logged but not auto-launched,
 -- preventing arbitrary command execution from tampered state files.
 local SAFE_RESTORE_PROCESSES = {
-	vim = true, nvim = true, gvim = true, vi = true,
-	htop = true, btop = true, top = true,
-	less = true, more = true, man = true,
+	vim = true,
+	nvim = true,
+	gvim = true,
+	vi = true,
+	htop = true,
+	btop = true,
+	top = true,
+	less = true,
+	more = true,
+	man = true,
 	claude = true,
 	nano = true,
-	tmux = true, screen = true,
+	tmux = true,
+	screen = true,
 }
 
 --- Function to restore text or processes when restoring panes
@@ -176,8 +184,9 @@ function pub.default_on_pane_restore(pane_tree)
 			pane:send_text(wezterm.shell_join_args(pane_tree.process.argv) .. "\r\n")
 		else
 			wezterm.log_warn(
-				"resurrect: skipping restore of unrecognized process: " .. base_name
-				.. " (add to SAFE_RESTORE_PROCESSES if intended)"
+				"resurrect: skipping restore of unrecognized process: "
+					.. base_name
+					.. " (add to SAFE_RESTORE_PROCESSES if intended)"
 			)
 		end
 	elseif pane_tree.text then
