@@ -19,7 +19,7 @@ local function get_file_path(file_name, type, opt_name)
 		"%s%s" .. utils.separator .. "%s.json",
 		pub.save_state_dir,
 		type,
-		file_name:gsub("[" .. utils.separator .. ":%[%]?/]", "+")
+		file_name:gsub("[" .. utils.separator .. ":%[%]?/*~!{}()&|;<>$`\"' \0]", "+")
 	)
 end
 
@@ -61,36 +61,124 @@ function pub.periodic_save(opts)
 		opts.interval_seconds = 60 * 15
 	end
 	wezterm.time.call_after(opts.interval_seconds, function()
-		wezterm.emit("resurrect.state_manager.periodic_save.start", opts)
+		local ok, err = pcall(function()
+			wezterm.emit("resurrect.state_manager.periodic_save.start", opts)
+			if opts.save_workspaces then
+				pub.save_state(require("resurrect.workspace_state").get_workspace_state())
+			end
+
+			if opts.save_windows then
+				for _, gui_win in ipairs(wezterm.gui.gui_windows()) do
+					local mux_win = gui_win:mux_window()
+					local title = mux_win:get_title()
+					if title and title ~= "" then
+						pub.save_state(require("resurrect.window_state").get_window_state(mux_win))
+					end
+				end
+			end
+
+			if opts.save_tabs then
+				for _, gui_win in ipairs(wezterm.gui.gui_windows()) do
+					local mux_win = gui_win:mux_window()
+					for _, mux_tab in ipairs(mux_win:tabs()) do
+						local title = mux_tab:get_title()
+						if title and title ~= "" then
+							pub.save_state(require("resurrect.tab_state").get_tab_state(mux_tab))
+						end
+					end
+				end
+			end
+
+			wezterm.emit("resurrect.state_manager.periodic_save.finished", opts)
+		end)
+		if not ok then
+			wezterm.log_error("resurrect: periodic_save failed: " .. tostring(err))
+			wezterm.emit("resurrect.error", "periodic_save failed: " .. tostring(err))
+		end
+		-- Always re-schedule, even after errors
+		pub.periodic_save(opts)
+	end)
+end
+
+---Saves the state whenever the pane or tab structure changes.
+---More responsive than periodic_save: fires immediately on splits, new tabs,
+---and closed panes rather than waiting for a timer.
+---Also supports an optional user variable trigger for shell-reported events
+---such as directory changes (requires shell integration to send the OSC 1337
+---SetUserVar sequence; see the README for details).
+---@param opts? { save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, user_var: string? }
+local _event_driven_save_registered = false
+function pub.event_driven_save(opts)
+	if _event_driven_save_registered then
+		wezterm.log_info("resurrect: event_driven_save already registered, skipping")
+		return
+	end
+	_event_driven_save_registered = true
+
+	opts = opts or {}
+	if opts.save_workspaces == nil then
+		opts.save_workspaces = true
+	end
+
+	local last_structure = {}
+
+	local function do_save(window)
+		wezterm.emit("resurrect.state_manager.event_driven_save.start", opts)
+
 		if opts.save_workspaces then
-			pub.save_state(require("resurrect.workspace_state").get_workspace_state())
+			local workspace_state = require("resurrect.workspace_state").get_workspace_state()
+			pub.save_state(workspace_state)
+			pub.write_current_state(workspace_state.workspace, "workspace")
 		end
 
 		if opts.save_windows then
-			for _, gui_win in ipairs(wezterm.gui.gui_windows()) do
-				local mux_win = gui_win:mux_window()
-				local title = mux_win:get_title()
-				if title ~= "" and title ~= nil then
-					pub.save_state(require("resurrect.window_state").get_window_state(mux_win))
-				end
+			local mux_win = window:mux_window()
+			local title = mux_win:get_title()
+			if title ~= "" and title ~= nil then
+				pub.save_state(require("resurrect.window_state").get_window_state(mux_win))
 			end
 		end
 
 		if opts.save_tabs then
-			for _, gui_win in ipairs(wezterm.gui.gui_windows()) do
-				local mux_win = gui_win:mux_window()
-				for _, mux_tab in ipairs(mux_win:tabs()) do
-					local title = mux_tab:get_title()
-					if title ~= "" and title ~= nil then
-						pub.save_state(require("resurrect.tab_state").get_tab_state(mux_tab))
-					end
+			local mux_win = window:mux_window()
+			for _, mux_tab in ipairs(mux_win:tabs()) do
+				local title = mux_tab:get_title()
+				if title ~= "" and title ~= nil then
+					pub.save_state(require("resurrect.tab_state").get_tab_state(mux_tab))
 				end
 			end
 		end
 
-		wezterm.emit("resurrect.state_manager.periodic_save.finished", opts)
-		pub.periodic_save(opts)
+		wezterm.emit("resurrect.state_manager.event_driven_save.finished", opts)
+	end
+
+	-- Save when the pane/tab structure changes (new split, new tab, closed pane).
+	-- pane-focus-changed fires on every focus move, so we compare tab+pane counts
+	-- and only save when the structure actually changes.
+	wezterm.on("pane-focus-changed", function(window, _pane)
+		local win_id = tostring(window:window_id())
+		local tabs = window:mux_window():tabs()
+		local pane_count = 0
+		for _, tab in ipairs(tabs) do
+			pane_count = pane_count + #tab:panes()
+		end
+		local sig = #tabs .. ":" .. pane_count
+		if last_structure[win_id] ~= sig then
+			last_structure[win_id] = sig
+			do_save(window)
+		end
 	end)
+
+	-- Optional: also save when the shell reports a user-defined variable change.
+	-- Useful for saving on directory change. Example shell integration (zsh/bash):
+	--   precmd() { printf "\033]1337;SetUserVar=WEZTERM_SAVE=%s\007" "$(printf 1 | base64)"; }
+	if opts.user_var then
+		wezterm.on("user-var-changed", function(window, _pane, name, _value)
+			if name == opts.user_var then
+				do_save(window)
+			end
+		end)
+	end
 end
 
 ---Writes the current state name and type
@@ -115,10 +203,10 @@ function pub.resurrect_on_gui_startup()
 			error("Could not open file: " .. file_path)
 		end
 		local name = file:read("*line")
-		local type = file:read("*line")
+		local state_type = file:read("*line")
 		file:close()
-		if type == "workspace" then
-			require("resurrect.workspace_state").restore_workspace(pub.load_state(name, type), {
+		if state_type == "workspace" then
+			require("resurrect.workspace_state").restore_workspace(pub.load_state(name, state_type), {
 				spawn_in_workspace = true,
 				relative = true,
 				restore_text = true,
@@ -127,12 +215,22 @@ function pub.resurrect_on_gui_startup()
 			wezterm.mux.set_active_workspace(name)
 		end
 	end)
+	if not suc then
+		wezterm.log_error("resurrect: gui_startup restore failed: " .. tostring(err))
+		wezterm.emit("resurrect.error", "gui_startup restore failed: " .. tostring(err))
+	end
 	return suc, err
 end
 
 ---@param file_path string
 function pub.delete_state(file_path)
 	wezterm.emit("resurrect.state_manager.delete_state.start", file_path)
+	-- Path confinement: reject traversal attempts
+	if file_path:find("%.%.") then
+		wezterm.log_error("resurrect: delete_state rejected path with '..': " .. file_path)
+		wezterm.emit("resurrect.error", "Invalid path: directory traversal not allowed")
+		return
+	end
 	local path = pub.save_state_dir .. file_path
 	local success = os.remove(path)
 	if not success then
@@ -153,7 +251,7 @@ end
 function pub.change_state_save_dir(directory)
 	local types = { "workspace", "window", "tab" }
 	for _, type in ipairs(types) do
-		utils.ensure_folder_exists(directory .. "/" .. type)
+		utils.ensure_folder_exists(directory .. utils.separator .. type)
 	end
 	pub.save_state_dir = directory
 end
