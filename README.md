@@ -266,6 +266,15 @@ resize_window: boolean?, -- Resizes the window, default: true
 on_pane_restore: fun(pane_tree: pane_tree)} -- Function to restore panes, use resurrect.tab_state.default_on_pane_restore
 ```
 
+> [!NOTE]
+> `spawn_in_workspace` defaults to `false` for backwards compatibility. When it is
+> `false` (or omitted), the restored windows are spawned into Wezterm's `"default"`
+> workspace rather than the saved one, and the active workspace is **not** changed —
+> so you stay where you are and the restored windows appear under `"default"`.
+> Set `spawn_in_workspace = true` to restore the windows into the saved workspace and
+> switch to it. By default `switch_workspace` follows `spawn_in_workspace`; set it
+> explicitly to switch (or not) independently of where the windows are spawned.
+
 #### Windows not resizing correctly
 
 Some users has had problems with `window_decorations` and `window_padding`
