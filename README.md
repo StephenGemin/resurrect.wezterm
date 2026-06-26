@@ -24,13 +24,13 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 
 ```lua
 local wezterm = require("wezterm")
-local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 ```
 
 2. Saving workspace, window and/or tab state based on name and title:
 
 ```lua
-local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 
 config.keys = {
   -- ...
@@ -65,7 +65,7 @@ config.keys = {
 3. Loading workspace or window state via. fuzzy finder:
 
 ```lua
-local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 
 config.keys = {
   -- ...
@@ -118,7 +118,7 @@ Public key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
 4.2. Enable encryption in your Wezterm config:
 
 ```lua
-local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 resurrect.state_manager.set_encryption({
   enable = true,
   method = "age" -- "age" is the default encryption method, but you can also specify "rage" or "gpg"
@@ -178,7 +178,7 @@ If you wish to share a non-documented way of encrypting your files or think some
 I use the builtin `resurrect.state_manager.periodic_save()` to save my workspaces every 15 minutes.
 This ensures that if I close Wezterm, then I can restore my session state to a state which is at most 15 minutes old.
 
-I also use it to restore the state of my workspaces. As I use the plugin [smart_workspace_switcher.wezterm](https://github.com/MLFlexer/smart_workspace_switcher.wezterm),
+I also use it to restore the state of my workspaces. As I use the plugin [smart_workspace_switcher.wezterm](https://github.com/StephenGemin/smart_workspace_switcher.wezterm),
 to change workspaces whenever I change "project" (git repository).
 I have added the following to my configuration to be able to do this whenever I change workspaces:
 
@@ -202,7 +202,7 @@ wezterm.on("smart_workspace_switcher.workspace_switcher.selected", function(wind
 end)
 ```
 
-You can checkout my configuration [here](https://github.com/MLFlexer/.dotfiles/tree/main/home-manager/config/wezterm).
+You can checkout my configuration [here](https://github.com/StephenGemin/.dotfiles/tree/main/home-manager/config/wezterm).
 
 ## Configuration
 
@@ -282,7 +282,7 @@ on_pane_restore: fun(pane_tree: pane_tree)} -- Function to restore panes, use re
 #### Windows not resizing correctly
 
 Some users has had problems with `window_decorations` and `window_padding`
-configuration options, which caused issues when resizing, see [comment](https://github.com/MLFlexer/resurrect.wezterm/issues/72#issuecomment-2582912347).
+configuration options, which caused issues when resizing, see [comment](https://github.com/StephenGemin/resurrect.wezterm/issues/72#issuecomment-2582912347).
 To avoid this, set the `resize_window` to false.
 
 ### Restoring into the current window
@@ -436,7 +436,7 @@ Here is an example of a json file:
                   "pixel_height":1000,
                   "pixel_width":1910,
                   "process":"/bin/bash", -- value is empty if attached to a remote domain
-                  "text":"Some text", -- not saved if attached to a remote domain, see https://github.com/MLFlexer/resurrect.wezterm/issues/41
+                  "text":"Some text", -- not saved if attached to a remote domain, see https://github.com/StephenGemin/resurrect.wezterm/issues/41
                   "top":0,
                   "width":191
                },
@@ -455,7 +455,7 @@ Here is an example of a json file:
 You can use the fuzzy finder to delete a saved state file by adding a keybind to your config:
 
 ```lua
-local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 
 config.keys = {
   -- ...
@@ -482,7 +482,7 @@ config.keys = {
 If you would like to add entries in your Wezterm command palette for renaming and switching workspaces:
 
 ```lua
-local workspace_switcher = wezterm.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
+local workspace_switcher = wezterm.plugin.require("https://github.com/StephenGemin/smart_workspace_switcher.wezterm")
 
 wezterm.on("augment-command-palette", function(window, pane)
   local workspace_state = resurrect.workspace_state
