@@ -8,21 +8,15 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel any in-progress run for the same PR when a new commit is pushed.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   lint:
     name: Lua checks
     runs-on: ubuntu-latest
-    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check formatting (StyLua)
+      - name: Install StyLua
         uses: JohnnyMorganz/stylua-action@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -40,13 +34,15 @@ jobs:
 
       - name: Install lua-language-server
         run: |
-          LLS_VERSION="3.11.1"
+          LLS_VERSION="3.13.6"
           curl -fsSL "https://github.com/LuaLS/lua-language-server/releases/download/${LLS_VERSION}/lua-language-server-${LLS_VERSION}-linux-x64.tar.gz" \
-            | sudo tar -xz -C /usr/local
+            | tar -xz -C /usr/local
+          sudo ln -sf /usr/local/bin/lua-language-server /usr/local/bin/lua-language-server
 
       - name: Run lua-language-server
         run: |
           lua-language-server --check plugin/ --logpath /tmp/lua-ls-log
+          # Fail if any errors were reported
           if grep -q '"severity":1' /tmp/lua-ls-log/check.json 2>/dev/null; then
             cat /tmp/lua-ls-log/check.json
             exit 1
