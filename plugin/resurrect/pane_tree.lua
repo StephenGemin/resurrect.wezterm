@@ -1,5 +1,6 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local utils = require("resurrect.utils")
+local process_handlers = require("resurrect.process_handlers")
 
 ---@class pane_tree_module
 ---@field max_nlines integer

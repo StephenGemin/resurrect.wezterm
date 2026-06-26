@@ -17,6 +17,10 @@ local function init()
 
 	require("resurrect.state_manager").change_state_save_dir(plugin_path .. separator .. "state" .. separator)
 
+	-- Must be loaded before workspace_state because the require chain
+	-- workspace_state → window_state → tab_state → pane_tree depends on it.
+	pub.process_handlers = require("resurrect.process_handlers")
+
 	-- Export submodules
 	pub.workspace_state = require("resurrect.workspace_state")
 	pub.window_state = require("resurrect.window_state")
@@ -141,9 +145,7 @@ function pub.setup(config, opts)
 			key = "w",
 			mods = "ALT",
 			action = wezterm.action_callback(function(win, pane)
-				pub.state_manager.save_state(
-					pub.workspace_state.get_workspace_state()
-				)
+				pub.state_manager.save_state(pub.workspace_state.get_workspace_state())
 			end),
 		})
 
