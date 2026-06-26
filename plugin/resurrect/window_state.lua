@@ -1,6 +1,5 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local tab_state_mod = require("resurrect.tab_state")
-local utils = require("resurrect.utils")
 
 local pub = {}
 
@@ -83,7 +82,7 @@ function pub.save_window_action()
 			window:perform_action(
 				wezterm.action.PromptInputLine({
 					description = "Enter window title",
-					action = wezterm.action_callback(function(inner_window, _, line)
+					action = wezterm.action_callback(function(_, _, line)
 						if line then
 							mux_window:set_title(line)
 							require("resurrect.state_manager").save_state(pub.get_window_state(mux_window))
