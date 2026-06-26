@@ -79,7 +79,11 @@ function pub.restore_window(window, window_state, opts)
 		end
 	end
 
-	active_tab:activate()
+	-- A corrupted or hand-edited state file may have no tab marked active; only
+	-- activate when one was found to avoid a nil dereference.
+	if active_tab then
+		active_tab:activate()
+	end
 	wezterm.emit("resurrect.window_state.restore_window.finished")
 end
 

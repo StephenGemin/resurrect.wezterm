@@ -71,10 +71,13 @@ end
 -- Create the folder if it does not exist
 ---@param path string
 function utils.ensure_folder_exists(path)
+	-- Use an args array via run_child_process so the path is never passed through a
+	-- shell; this avoids command injection from paths containing shell metacharacters.
 	if utils.is_windows then
-		os.execute('mkdir /p "' .. path:gsub("/", "\\" .. '"'))
+		-- `mkdir` is a cmd builtin that creates intermediate directories by default.
+		wezterm.run_child_process({ "cmd", "/c", "mkdir", (path:gsub("/", "\\")) })
 	else
-		os.execute('mkdir -p "' .. path .. '"')
+		wezterm.run_child_process({ "mkdir", "-p", path })
 	end
 end
 
