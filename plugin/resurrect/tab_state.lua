@@ -162,7 +162,6 @@ local SAFE_RESTORE_PROCESSES = {
 	less = true,
 	more = true,
 	man = true,
-	claude = true,
 	nano = true,
 	tmux = true,
 	screen = true,

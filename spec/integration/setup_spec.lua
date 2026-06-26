@@ -22,22 +22,17 @@ local function make_resurrect()
 end
 
 describe("resurrect.setup(config) — minimal user config", function()
-	-- -----------------------------------------------------------------------
-	-- Guard: setup() must not error when claude_hooks is explicitly disabled.
-	-- This is the baseline — if even this fails, something more fundamental
-	-- is broken than the process_handlers issue.
-	-- -----------------------------------------------------------------------
-	it("completes without error when claude_hooks=false", function()
+	it("completes without error for default options", function()
 		local resurrect = make_resurrect()
 		assert.has_no.errors(function()
-			resurrect.setup({ keys = {} }, { claude_hooks = false })
+			resurrect.setup({ keys = {} })
 		end)
 	end)
 
-	it("creates config.keys when the table is absent and keybindings=true (default)", function()
+	it("creates config.keys when the table is absent", function()
 		local resurrect = make_resurrect()
 		local config = {}
-		resurrect.setup(config, { claude_hooks = false })
+		resurrect.setup(config)
 		assert.is_table(config.keys)
 		assert.is_true(#config.keys >= 1)
 	end)
@@ -45,20 +40,20 @@ describe("resurrect.setup(config) — minimal user config", function()
 	it("injects at least 4 keybindings (save-workspace, save-window, save-tab, fuzzy-load)", function()
 		local resurrect = make_resurrect()
 		local config = { keys = {} }
-		resurrect.setup(config, { claude_hooks = false })
+		resurrect.setup(config)
 		assert.is_true(#config.keys >= 4, "expected at least 4 keybindings, got " .. #config.keys)
 	end)
 
 	it("does not add any keybindings when keybindings=false", function()
 		local resurrect = make_resurrect()
 		local config = { keys = {} }
-		resurrect.setup(config, { keybindings = false, claude_hooks = false })
+		resurrect.setup(config, { keybindings = false })
 		assert.are.equal(0, #config.keys)
 	end)
 
 	it("registers the gui-startup event for session restore on launch", function()
 		local resurrect, rec = make_resurrect()
-		resurrect.setup({ keys = {} }, { claude_hooks = false })
+		resurrect.setup({ keys = {} })
 		local found = false
 		for _, call in ipairs(rec.calls) do
 			if call.name == "on" and call.event == "gui-startup" then
@@ -71,22 +66,7 @@ describe("resurrect.setup(config) — minimal user config", function()
 
 	it("schedules periodic_save via wezterm.time.call_after", function()
 		local resurrect, rec = make_resurrect()
-		resurrect.setup({ keys = {} }, { claude_hooks = false })
+		resurrect.setup({ keys = {} })
 		assert.not_nil(helper.find_call(rec, "call_after"), "periodic_save was not scheduled")
-	end)
-
-	-- -----------------------------------------------------------------------
-	-- BUG: pub.process_handlers is never assigned in init(), so calling
-	-- setup() with the default claude_hooks=true panics:
-	--   "attempt to index a nil value (field 'process_handlers')"
-	--
-	-- Fix: create plugin/resurrect/process_handlers.lua and require it in
-	-- init(), assigning the result to pub.process_handlers.
-	-- -----------------------------------------------------------------------
-	it("completes without error for fully default options (claude_hooks=true)", function()
-		local resurrect = make_resurrect()
-		assert.has_no.errors(function()
-			resurrect.setup({ keys = {} })
-		end)
 	end)
 end)

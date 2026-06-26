@@ -17,10 +17,6 @@ local function init()
 
 	require("resurrect.state_manager").change_state_save_dir(plugin_path .. separator .. "state" .. separator)
 
-	-- Must be loaded before workspace_state because the require chain
-	-- workspace_state → window_state → tab_state → pane_tree depends on it.
-	pub.process_handlers = require("resurrect.process_handlers")
-
 	-- Export submodules
 	pub.workspace_state = require("resurrect.workspace_state")
 	pub.window_state = require("resurrect.window_state")
@@ -45,7 +41,6 @@ init()
 ---   save_tabs          = true
 ---   keybindings        = true   -- add Alt+W/R/Shift+W/Shift+T bindings
 ---   status_bar         = true   -- show save time + tab titles in right status
----   claude_hooks       = true   -- auto-configure Claude Code SessionStart hook
 ---
 ---@param config table wezterm config_builder object
 ---@param opts? table optional overrides
@@ -54,11 +49,6 @@ function pub.setup(config, opts)
 	local save_workspaces = opts.save_workspaces ~= false
 	local save_windows = opts.save_windows ~= false
 	local save_tabs = opts.save_tabs ~= false
-
-	-- Claude Code session hook setup (idempotent)
-	if opts.claude_hooks ~= false then
-		pub.process_handlers.setup_claude_session_hooks()
-	end
 
 	-- Event-driven save: fires on pane/tab structure changes
 	pub.state_manager.event_driven_save({
