@@ -3,8 +3,23 @@ local function is_windows()
 end
 
 -- Minimal wezterm stub for utils.lua.
+-- utils.shell_mkdir() shells out via wezterm.run_child_process on Unix, so the
+-- stub must actually execute the argv array for the directory side effects the
+-- assertions below depend on. Each arg is quoted so paths with spaces survive.
 local wezterm_stub = {
   target_triple = is_windows() and "x86_64-pc-windows-msvc" or "x86_64-unknown-linux-gnu",
+  run_child_process = function(argv)
+    local parts = {}
+    for _, a in ipairs(argv) do
+      if is_windows() then
+        parts[#parts + 1] = '"' .. tostring(a) .. '"'
+      else
+        parts[#parts + 1] = "'" .. tostring(a):gsub("'", "'\\''") .. "'"
+      end
+    end
+    local ok = os.execute(table.concat(parts, " "))
+    return ok == true or ok == 0, "", ""
+  end,
 }
 _G.wezterm = wezterm_stub
 package.preload["wezterm"] = function()

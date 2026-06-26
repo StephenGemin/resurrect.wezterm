@@ -155,7 +155,7 @@ function pub.event_driven_save(opts)
 	-- Save when the pane/tab structure changes (new split, new tab, closed pane).
 	-- pane-focus-changed fires on every focus move, so we compare tab+pane counts
 	-- and only save when the structure actually changes.
-	wezterm.on("pane-focus-changed", function(window, pane)
+	wezterm.on("pane-focus-changed", function(window, _pane)
 		local win_id = tostring(window:window_id())
 		local tabs = window:mux_window():tabs()
 		local pane_count = 0
@@ -173,7 +173,7 @@ function pub.event_driven_save(opts)
 	-- Useful for saving on directory change. Example shell integration (zsh/bash):
 	--   precmd() { printf "\033]1337;SetUserVar=WEZTERM_SAVE=%s\007" "$(printf 1 | base64)"; }
 	if opts.user_var then
-		wezterm.on("user-var-changed", function(window, pane, name, value)
+		wezterm.on("user-var-changed", function(window, _pane, name, _value)
 			if name == opts.user_var then
 				do_save(window)
 			end

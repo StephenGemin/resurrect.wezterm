@@ -20,10 +20,11 @@ function pub.write_file(file_path, str)
 		handle:flush()
 		handle:close()
 		-- Atomic rename (on same filesystem)
-		local ok, rename_err = os.rename(tmp_path, file_path)
+		local ok = os.rename(tmp_path, file_path)
 		if not ok then
 			-- Fallback: on Windows os.rename can fail if target exists
 			os.remove(file_path)
+			local rename_err
 			ok, rename_err = os.rename(tmp_path, file_path)
 			if not ok then
 				error("Could not rename temp file: " .. (rename_err or "unknown"))
