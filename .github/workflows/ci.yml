@@ -1,0 +1,49 @@
+name: CI
+
+# Run on every PR open/reopen and on every push to an open PR.
+# Using only `pull_request` avoids the double-run you get when both
+# `push` and `pull_request` are listed — GitHub fires `pull_request`
+# on synchronize (new push to a PR branch) automatically.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lua checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install StyLua
+        uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check plugin/
+
+      - name: Install luacheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luarocks
+          sudo luarocks install luacheck
+
+      - name: Run luacheck
+        run: luacheck plugin/
+
+      - name: Install lua-language-server
+        run: |
+          LLS_VERSION="3.13.6"
+          curl -fsSL "https://github.com/LuaLS/lua-language-server/releases/download/${LLS_VERSION}/lua-language-server-${LLS_VERSION}-linux-x64.tar.gz" \
+            | tar -xz -C /usr/local
+          sudo ln -sf /usr/local/bin/lua-language-server /usr/local/bin/lua-language-server
+
+      - name: Run lua-language-server
+        run: |
+          lua-language-server --check plugin/ --logpath /tmp/lua-ls-log
+          # Fail if any errors were reported
+          if grep -q '"severity":1' /tmp/lua-ls-log/check.json 2>/dev/null; then
+            cat /tmp/lua-ls-log/check.json
+            exit 1
+          fi
