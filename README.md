@@ -84,6 +84,10 @@ config.keys = {
         }
         if type == "workspace" then
           local state = resurrect.state_manager.load_state(id, "workspace")
+          -- `spawn_in_workspace` restores the windows into the saved workspace and
+          -- switches you to it. Without it the windows land in the "default"
+          -- workspace instead of the one you selected.
+          opts.spawn_in_workspace = true
           resurrect.workspace_state.restore_workspace(state, opts)
         elseif type == "window" then
           local state = resurrect.state_manager.load_state(id, "window")
@@ -249,7 +253,8 @@ which will rename the file to the name of the string.
 Options for restoring state:
 
 ```lua
-{spawn_in_workspace: boolean?, -- Restores in the workspace
+{spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace instead of the "default" workspace
+switch_workspace: boolean?, -- Switch the active workspace to the restored one; defaults to the value of spawn_in_workspace
 relative: boolean?, -- Use relative size when restoring panes
 absolute: boolean?, -- Use absolute size when restoring panes
 close_open_tabs: boolean?, -- Closes all tabs which are open in the window, only restored tabs are left
