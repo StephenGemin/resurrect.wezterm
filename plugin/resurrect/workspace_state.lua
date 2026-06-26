@@ -61,7 +61,9 @@ function pub.restore_workspace(workspace_state, opts)
 	end
 	if should_switch and workspace_state.workspace and workspace_state.workspace ~= "" then
 		wezterm.mux.set_active_workspace(workspace_state.workspace)
-	end
+	else
+		wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), workspace_state.workspace)
+  end
 
 	wezterm.emit("resurrect.workspace_state.restore_workspace.finished")
 end
