@@ -70,8 +70,30 @@ jobs:
       - name: Set up LuaRocks
         uses: leafo/gh-actions-luarocks@v4
 
+      - name: Install busted
+        run: luarocks install busted
+
+      - name: Run unit tests
+        run: busted --run=unit
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Lua 5.4
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.4"
+
+      - name: Set up LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
       - name: Install busted and lunajson
         run: luarocks install busted && luarocks install lunajson
 
-      - name: Run unit tests
-        run: busted
+      - name: Run integration tests
+        run: busted --run=integration

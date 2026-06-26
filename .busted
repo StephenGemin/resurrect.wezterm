@@ -1,8 +1,20 @@
 return {
+	-- Default (plain `busted` with no args) runs unit tests only.
 	default = {
-		-- Make the plugin sources and the spec helpers importable.
 		lpath = "./plugin/?.lua;./spec/?.lua",
 		pattern = "_spec",
 		ROOT = { "spec" },
+		exclude_pattern = "integration",
+	},
+	unit = {
+		lpath = "./plugin/?.lua;./spec/?.lua",
+		pattern = "_spec",
+		ROOT = { "spec" },
+		exclude_pattern = "integration",
+	},
+	integration = {
+		lpath = "./plugin/?.lua;./spec/?.lua",
+		pattern = "_spec",
+		ROOT = { "spec/integration" },
 	},
 }
