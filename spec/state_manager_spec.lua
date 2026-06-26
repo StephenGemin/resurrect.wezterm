@@ -71,4 +71,19 @@ describe("state_manager path construction (via load_state)", function()
       last_load_path
     )
   end)
+
+  it("routes a tab state name to the tab/ dir", function()
+    -- workspace and window are covered above; pin the third documented type so
+    -- the full routing matrix is exercised.
+    state_manager.load_state("editor", "tab")
+    assert.equals(base .. "tab" .. sep .. "editor.json", last_load_path)
+  end)
+
+  it("always replaces a literal forward slash so names cannot escape the type dir", function()
+    -- "/" must be sanitized on every platform: it is the path separator on Unix
+    -- and a reserved filename character on Windows. This is asserted with a
+    -- hardcoded "/" (not `sep`) so the invariant holds even where sep is "\\".
+    state_manager.load_state("feature/branch", "workspace")
+    assert.equals(base .. "workspace" .. sep .. "feature+branch.json", last_load_path)
+  end)
 end)

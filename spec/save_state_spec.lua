@@ -51,6 +51,11 @@ describe("state_manager.save_state", function()
 		assert.are.equal("/states/workspace/custom.json", writes[1].path)
 	end)
 
+	it("sanitises a path separator in the opt_name override so it stays in one directory", function()
+		state_manager.save_state({ workspace = "proj", window_states = {} }, "team/custom")
+		assert.are.equal("/states/workspace/team+custom.json", writes[1].path)
+	end)
+
 	it("does not write anything for an unrecognised state shape", function()
 		state_manager.save_state({ something = "else" })
 		assert.are.equal(0, #writes)
