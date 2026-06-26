@@ -70,8 +70,8 @@ jobs:
       - name: Set up LuaRocks
         uses: leafo/gh-actions-luarocks@v4
 
-      - name: Install busted
-        run: luarocks install busted
+      - name: Install busted and lunajson
+        run: luarocks install busted && luarocks install lunajson
 
       - name: Run unit tests
         run: busted
