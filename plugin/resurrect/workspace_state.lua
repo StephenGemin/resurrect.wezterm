@@ -16,6 +16,13 @@ function pub.restore_workspace(workspace_state, opts)
 		opts = {}
 	end
 
+	-- Default to restoring the windows into (and switching to) the saved
+	-- workspace. Pass `spawn_in_workspace = false` to keep the legacy behaviour of
+	-- spawning them into the "default" workspace without switching.
+	if opts.spawn_in_workspace == nil then
+		opts.spawn_in_workspace = true
+	end
+
 	for i, window_state in ipairs(workspace_state.window_states) do
 		if i == 1 and opts.window then
 			-- inner size is in pixels
@@ -42,6 +49,20 @@ function pub.restore_workspace(workspace_state, opts)
 
 		window_state_mod.restore_window(opts.window, window_state, opts)
 	end
+
+	-- Switch the active workspace to the one just restored, so the user actually
+	-- lands in it rather than staying in (or being dropped into) another workspace.
+	-- Backwards compatible: when `switch_workspace` is unset we fall back to the
+	-- value of `spawn_in_workspace`, preserving the previous behaviour for callers
+	-- that did neither. Pass `switch_workspace = false` to opt out explicitly.
+	local should_switch = opts.switch_workspace
+	if should_switch == nil then
+		should_switch = opts.spawn_in_workspace
+	end
+	if should_switch and workspace_state.workspace and workspace_state.workspace ~= "" then
+		wezterm.mux.set_active_workspace(workspace_state.workspace)
+	end
+
 	wezterm.emit("resurrect.workspace_state.restore_workspace.finished")
 end
 
