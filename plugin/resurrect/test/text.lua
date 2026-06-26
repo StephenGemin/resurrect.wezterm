@@ -14,7 +14,7 @@ end
 
 function pub.write_and_save_current_window()
 	return wezterm.action_callback(function(win, pane)
-		local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+		local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 		local mux_win = win:mux_window()
 		pub.write_all_chars(pane)
 		mux_win:set_title("TEST_WRITING_CHARS")
