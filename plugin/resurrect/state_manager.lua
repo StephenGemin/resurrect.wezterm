@@ -12,8 +12,11 @@ local function get_file_path(file_name, type, opt_name)
 	if opt_name then
 		file_name = opt_name
 	end
+	-- save_state_dir carries a trailing separator (see init.lua), so the format
+	-- string must not add one between it and `type` -- doing so yields a double
+	-- separator (e.g. /states//workspace/...).
 	return string.format(
-		"%s" .. utils.separator .. "%s" .. utils.separator .. "%s.json",
+		"%s%s" .. utils.separator .. "%s.json",
 		pub.save_state_dir,
 		type,
 		file_name:gsub("[" .. utils.separator .. ":%[%]?/]", "+")
