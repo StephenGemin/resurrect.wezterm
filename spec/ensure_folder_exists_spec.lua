@@ -16,10 +16,6 @@ local search_paths = {
   "./plugin/?.lua",
   "./plugin/?/init.lua",
   "./plugin/?/?.lua",
-  -- when cwd is plugin/resurrect
-  "../../plugin/?.lua",
-  "../../plugin/?/init.lua",
-  "../../plugin/?/?.lua",
 }
 
 package.path = table.concat(search_paths, ";") .. ";" .. package.path
