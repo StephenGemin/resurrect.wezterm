@@ -1,8 +1,3 @@
-> [!WARNING]
-> This project is archived and no longer maintained. 
-> I'm currently focusing on my PhD and don't find it interesting to work on this anymore. 
-> Please fork/use one of the forks instead 😃
-
 # resurrect.wezterm
 
 Resurrect your terminal environment!⚰️ A plugin to save the state of your windows, tabs and panes. Inspired by [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) and [tmux-continuum](https://github.com/tmux-plugins/tmux-continuum).
@@ -18,18 +13,54 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 - Re-attach to remote domains (e.g. SSH, SSHMUX, WSL, Docker, ect.).
 - Optionally enable encryption and decryption of the saved state.
 
-## Setup example
-
-1. Require the plugin:
+## Basic Setup
 
 ```lua
 local wezterm = require("wezterm")
+local config = wezterm.config_builder()
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
+
+-- your existing config here (colors, fonts, shell, etc.)
+
+resurrect.setup(config)
+
+return config
 ```
 
-2. Saving workspace, window and/or tab state based on name and title:
+### Setup Options
+
+All options are optional. Defaults are shown below:
 
 ```lua
+resurrect.setup(config, {
+  periodic_interval = 300,  -- seconds between periodic saves
+  restore_delay     = 0,    -- seconds to wait before sending process-restore commands
+  save_workspaces   = true,
+  save_windows      = true,
+  save_tabs         = true,
+  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R bindings
+  status_bar        = true, -- show last save time and tab titles in the right status bar
+})
+```
+
+Set any option to `false` to disable that feature. For example, to skip the built-in
+keybindings and define your own:
+
+```lua
+resurrect.setup(config, { keybindings = false })
+
+-- Add your own custom bindings here
+config.keys = { ... }
+```
+
+## Advanced Setup (Manual Configuration)
+
+If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
+
+1. Saving workspace, window and/or tab state based on name and title:
+
+```lua
+local wezterm = require("wezterm")
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 
 config.keys = {
@@ -62,7 +93,7 @@ config.keys = {
 }
 ```
 
-3. Loading workspace or window state via. fuzzy finder:
+2. Loading workspace or window state via. fuzzy finder:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -101,7 +132,7 @@ config.keys = {
 }
 ```
 
-4. Optional, enable encryption (recommended):
+3. Optional, enable encryption (recommended):
    You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
 
 4.1. Install `age` and generate a key with:

@@ -49,6 +49,9 @@ function M.new_wezterm(o)
 	function wz.emit(event, ...)
 		table.insert(rec.emits, { event = event, args = { ... } })
 	end
+	function wz.on(event, fn)
+		table.insert(rec.calls, { name = "on", event = event, fn = fn })
+	end
 	function wz.log_error() end
 	function wz.log_warn() end
 	function wz.log_info() end

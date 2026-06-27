@@ -3,6 +3,11 @@ local pane_tree_mod = require("resurrect.pane_tree")
 local state_manager_mod = require("resurrect.state_manager")
 local pub = {}
 
+-- Seconds to wait before sending a process-restore command to a pane.
+-- Shells need a moment to initialise before they can accept input.
+-- Set via resurrect.setup(config, { restore_delay = N }) or directly.
+pub.process_restore_delay_seconds = 0
+
 ---Function used to split panes when mapping over the pane_tree
 ---@param opts restore_opts
 ---@return fun(acc: {active_pane: Pane, is_zoomed: boolean}, pane_tree: pane_tree): {active_pane: Pane, is_zoomed: boolean}
@@ -162,7 +167,6 @@ local SAFE_RESTORE_PROCESSES = {
 	less = true,
 	more = true,
 	man = true,
-	claude = true,
 	nano = true,
 	tmux = true,
 	screen = true,
@@ -181,7 +185,14 @@ function pub.default_on_pane_restore(pane_tree)
 		base_name = base_name:gsub("%.exe$", ""):lower()
 
 		if SAFE_RESTORE_PROCESSES[base_name] then
-			pane:send_text(wezterm.shell_join_args(pane_tree.process.argv) .. "\r\n")
+			local cmd = wezterm.shell_join_args(pane_tree.process.argv) .. "\r\n"
+			if pub.process_restore_delay_seconds > 0 then
+				wezterm.time.call_after(pub.process_restore_delay_seconds, function()
+					pane:send_text(cmd)
+				end)
+			else
+				pane:send_text(cmd)
+			end
 		else
 			wezterm.log_warn(
 				"resurrect: skipping restore of unrecognized process: "

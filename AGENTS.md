@@ -15,7 +15,7 @@ processes. Inspired by `tmux-resurrect` and `tmux-continuum`.
 
 ```
 plugin/
-  init.lua                   entry point; loads modules, sets state directory
+  init.lua                   entry point; loads modules, sets state directory, exports setup()
   types.lua                  Lua type aliases (tab_size, workspace_state, restore_opts …)
   resurrect/
     state_manager.lua        save/load/delete state, periodic auto-save, startup restore
@@ -29,11 +29,16 @@ plugin/
     fuzzy_loader.lua         fuzzy-finder UI for picking a saved state to load
     test/
       text.lua               manual test helper — injects chars to exercise encoding
+spec/
+  spec_helper.lua            shared wezterm mock and module loader for busted specs
+  unit/                      unit tests (busted --run=unit)
+  integration/               integration tests; require lunajson (busted --run=integration)
 README.md
 AGENTS.md                    (this file)
 CLAUDE.md                    AI assistant guidance
+.busted                      busted named configs: unit, integration, default (= unit)
 .luarc.json                  Lua LSP config (Lua 5.4, wezterm globals)
-.github/workflows/ci.yml     stylua + luacheck + lua-language-server on PRs
+.github/workflows/ci.yml     stylua + luacheck + lua-language-server + unit + integration
 ```
 
 State files are saved outside the repo (default: `$XDG_DATA_HOME/wezterm/resurrect/`
@@ -60,21 +65,23 @@ stylua --check plugin/          # formatting
 luacheck plugin/                # linting
 lua-language-server --check plugin/ --logpath /tmp/lua-ls-log  # type / nil checks
 
-# Unit tests (CI runs these on every PR)
-busted                          # runs everything under spec/ (needs Lua 5.4 + busted)
+# Unit tests (CI runs these on every PR; needs Lua 5.4 + busted)
+busted --run=unit               # spec/unit/ only
+busted --run=integration        # spec/integration/ only (also needs lunajson)
+busted                          # default: same as --run=unit
 
 # Manual smoke test inside Wezterm
 # Add the plugin to your wezterm.lua, then use the save/load keybindings
 # described in README.md and verify state round-trips correctly.
 ```
 
-CI (`.github/workflows/ci.yml`) has two jobs that must stay green on every PR and on
-every push to an open PR:
+CI (`.github/workflows/ci.yml`) has three jobs that must stay green on every PR:
 
 - `lint` — stylua, luacheck, and lua-ls over `plugin/`.
-- `test` — the busted unit suite under `spec/`.
+- `test` — the busted unit suite (`spec/unit/`).
+- `integration` — the busted integration suite (`spec/integration/`); installs lunajson.
 
-### Unit tests (`spec/`)
+### Unit tests (`spec/unit/`)
 
 The suite targets the **user-facing contract documented in README.md** — the public
 API names a user's `wezterm.lua` calls, and the documented default behaviours — so a
@@ -87,7 +94,7 @@ installs a controllable `wezterm` mock and (re)loads a module against it; specs 
 on recorded side effects (emitted events, mux/timer calls). When you add a module that
 touches a new `wezterm.*` field, extend the mock in `spec/spec_helper.lua`.
 
-Current specs:
+Current unit specs:
 
 - `api_surface_spec.lua` — every `resurrect.*` function the README references exists,
   and `init.lua` exports the submodules under the documented names.
@@ -97,7 +104,20 @@ Current specs:
   matrix flagged as a breaking change in README.
 - `periodic_save_spec.lua` — the documented 15-minute default and that it saves.
 
-Run a single file with `busted spec/save_state_spec.lua`.
+Run a single file with `busted spec/unit/save_state_spec.lua`.
+
+### Integration tests (`spec/integration/`)
+
+These load `init.lua` the same way WezTerm does (real `require` chain, real tmpdir)
+and exercise the full save → load pipeline against actual filesystem I/O. They require
+`lunajson` (`luarocks install lunajson`).
+
+Current integration specs:
+
+- `setup_spec.lua` — `resurrect.setup(config)` completes without error and wires
+  keybindings, gui-startup, and periodic_save correctly.
+- `round_trip_spec.lua` — workspace state survives a full save → load cycle with real
+  JSON encoding and real files on disk.
 
 ## Code style
 
