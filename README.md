@@ -38,7 +38,7 @@ resurrect.setup(config, {
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
-  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R bindings
+  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R / Alt+D bindings
   status_bar        = true, -- show last save time and tab titles in the right status bar
 })
 ```
@@ -68,9 +68,7 @@ config.keys = {
   {
     key = "w",
     mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-        resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
-      end),
+    action = resurrect.workspace_state.save_workspace_action(),
   },
   {
     key = "W",
@@ -81,14 +79,6 @@ config.keys = {
     key = "T",
     mods = "ALT",
     action = resurrect.tab_state.save_tab_action(),
-  },
-  {
-    key = "s",
-    mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-        resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
-        resurrect.window_state.save_window_action()
-      end),
   },
 }
 ```
@@ -103,34 +93,56 @@ config.keys = {
   {
     key = "r",
     mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-      resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
-        local type = string.match(id, "^([^/]+)") -- match before '/'
-        id = string.match(id, "([^/]+)$") -- match after '/'
-        id = string.match(id, "(.+)%..+$") -- remove file extention
-        local opts = {
-          relative = true,
-          restore_text = true,
-          on_pane_restore = resurrect.tab_state.default_on_pane_restore,
-        }
-        if type == "workspace" then
-          local state = resurrect.state_manager.load_state(id, "workspace")
-          -- Restores the windows into the saved workspace and switches you to it.
-          -- This is the default; pass `spawn_in_workspace = false` to instead spawn
-          -- them into the "default" workspace without switching.
-          resurrect.workspace_state.restore_workspace(state, opts)
-        elseif type == "window" then
-          local state = resurrect.state_manager.load_state(id, "window")
-          resurrect.window_state.restore_window(pane:window(), state, opts)
-        elseif type == "tab" then
-          local state = resurrect.state_manager.load_state(id, "tab")
-          resurrect.tab_state.restore_tab(pane:tab(), state, opts)
-        end
-      end)
-    end),
+    action = resurrect.fuzzy_loader.restore_action(),
   },
 }
 ```
+
+`restore_action` accepts the same `restore_opts` as `restore_workspace` / `restore_window` / `restore_tab`,
+plus an optional `fuzzy_load_opts` sub-table to customise the picker:
+
+```lua
+action = resurrect.fuzzy_loader.restore_action({
+  relative = true,
+  restore_text = true,
+  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  -- fuzzy_load_opts = { show_state_with_date = true },
+})
+```
+
+<details>
+<summary>Manual dispatch (advanced)</summary>
+
+If you need full control over how each state type is restored, call `fuzzy_load` directly:
+
+```lua
+action = wezterm.action_callback(function(win, pane)
+  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
+    local type = string.match(id, "^([^/]+)") -- match before '/'
+    id = string.match(id, "([^/]+)$") -- match after '/'
+    id = string.match(id, "(.+)%..+$") -- remove file extension
+    local opts = {
+      relative = true,
+      restore_text = true,
+      on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+    }
+    if type == "workspace" then
+      local state = resurrect.state_manager.load_state(id, "workspace")
+      -- Restores the windows into the saved workspace and switches you to it.
+      -- Pass `spawn_in_workspace = false` to spawn into "default" without switching.
+      resurrect.workspace_state.restore_workspace(state, opts)
+    elseif type == "window" then
+      local state = resurrect.state_manager.load_state(id, "window")
+      resurrect.window_state.restore_window(pane:window(), state, opts)
+    elseif type == "tab" then
+      local state = resurrect.state_manager.load_state(id, "tab")
+      resurrect.tab_state.restore_tab(pane:tab(), state, opts)
+    end
+  end)
+end),
+```
+
+</details>
 
 3. Optional, enable encryption (recommended):
    You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
@@ -493,20 +505,31 @@ config.keys = {
   {
     key = "d",
     mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-      resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
-          resurrect.state_manager.delete_state(id)
-        end,
-        {
-          title = "Delete State",
-          description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
-          fuzzy_description = "Search State to Delete: ",
-          is_fuzzy = true,
-        })
-    end),
+    action = resurrect.fuzzy_loader.delete_action(),
   },
 }
 ```
+
+`delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` to customise the picker title, description, etc.
+
+<details>
+<summary>Manual dispatch (advanced)</summary>
+
+```lua
+action = wezterm.action_callback(function(win, pane)
+  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
+      resurrect.state_manager.delete_state(id)
+    end,
+    {
+      title = "Delete State",
+      description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
+      fuzzy_description = "Search State to Delete: ",
+      is_fuzzy = true,
+    })
+end),
+```
+
+</details>
 
 ## Augmenting the command palette
 
