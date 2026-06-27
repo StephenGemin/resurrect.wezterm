@@ -38,7 +38,7 @@ resurrect.setup(config, {
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
-  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R bindings
+  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R / Alt+D bindings
   status_bar        = true, -- show last save time and tab titles in the right status bar
 })
 ```
@@ -53,11 +53,13 @@ resurrect.setup(config, { keybindings = false })
 config.keys = { ... }
 ```
 
-## Advanced Setup (Manual Configuration)
+## Advanced Setup
 
 If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
 
-1. Saving workspace, window and/or tab state based on name and title:
+### Saving state
+
+Save workspace, window and/or tab state based on name and title:
 
 ```lua
 local wezterm = require("wezterm")
@@ -68,9 +70,7 @@ config.keys = {
   {
     key = "w",
     mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-        resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
-      end),
+    action = resurrect.workspace_state.save_workspace_action(),
   },
   {
     key = "W",
@@ -82,18 +82,12 @@ config.keys = {
     mods = "ALT",
     action = resurrect.tab_state.save_tab_action(),
   },
-  {
-    key = "s",
-    mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-        resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
-        resurrect.window_state.save_window_action()
-      end),
-  },
 }
 ```
 
-2. Loading workspace or window state via. fuzzy finder:
+### Loading state
+
+Load workspace or window state via. fuzzy finder:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -103,39 +97,96 @@ config.keys = {
   {
     key = "r",
     mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-      resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
-        local type = string.match(id, "^([^/]+)") -- match before '/'
-        id = string.match(id, "([^/]+)$") -- match after '/'
-        id = string.match(id, "(.+)%..+$") -- remove file extention
-        local opts = {
-          relative = true,
-          restore_text = true,
-          on_pane_restore = resurrect.tab_state.default_on_pane_restore,
-        }
-        if type == "workspace" then
-          local state = resurrect.state_manager.load_state(id, "workspace")
-          -- Restores the windows into the saved workspace and switches you to it.
-          -- This is the default; pass `spawn_in_workspace = false` to instead spawn
-          -- them into the "default" workspace without switching.
-          resurrect.workspace_state.restore_workspace(state, opts)
-        elseif type == "window" then
-          local state = resurrect.state_manager.load_state(id, "window")
-          resurrect.window_state.restore_window(pane:window(), state, opts)
-        elseif type == "tab" then
-          local state = resurrect.state_manager.load_state(id, "tab")
-          resurrect.tab_state.restore_tab(pane:tab(), state, opts)
-        end
-      end)
-    end),
+    action = resurrect.fuzzy_loader.restore_action(),
   },
 }
 ```
 
-3. Optional, enable encryption (recommended):
-   You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
+`restore_action` accepts the same `restore_opts` as `restore_workspace` / `restore_window` / `restore_tab`,
+plus an optional `fuzzy_load_opts` sub-table to customise the picker:
 
-4.1. Install `age` and generate a key with:
+```lua
+action = resurrect.fuzzy_loader.restore_action({
+  relative = true,
+  restore_text = true,
+  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  -- fuzzy_load_opts = { show_state_with_date = true },
+})
+```
+
+#### Manual dispatch
+
+If you need full control over how each state type is restored, call `fuzzy_load` directly:
+
+```lua
+action = wezterm.action_callback(function(win, pane)
+  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
+    local type = string.match(id, "^([^/]+)") -- match before '/'
+    id = string.match(id, "([^/]+)$") -- match after '/'
+    id = string.match(id, "(.+)%..+$") -- remove file extension
+    local opts = {
+      relative = true,
+      restore_text = true,
+      on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+    }
+    if type == "workspace" then
+      local state = resurrect.state_manager.load_state(id, "workspace")
+      -- Restores the windows into the saved workspace and switches you to it.
+      -- Pass `spawn_in_workspace = false` to spawn into "default" without switching.
+      resurrect.workspace_state.restore_workspace(state, opts)
+    elseif type == "window" then
+      local state = resurrect.state_manager.load_state(id, "window")
+      resurrect.window_state.restore_window(pane:window(), state, opts)
+    elseif type == "tab" then
+      local state = resurrect.state_manager.load_state(id, "tab")
+      resurrect.tab_state.restore_tab(pane:tab(), state, opts)
+    end
+  end)
+end),
+```
+
+### Deleting state
+
+You can use the fuzzy finder to delete a saved state file by adding a keybind to your config:
+
+```lua
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
+
+config.keys = {
+  -- ...
+  {
+    key = "d",
+    mods = "ALT",
+    action = resurrect.fuzzy_loader.delete_action(),
+  },
+}
+```
+
+`delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` to customise the picker title, description, etc.
+
+#### Manual dispatch
+
+```lua
+action = wezterm.action_callback(function(win, pane)
+  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
+      resurrect.state_manager.delete_state(id)
+    end,
+    {
+      title = "Delete State",
+      description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
+      fuzzy_description = "Search State to Delete: ",
+      is_fuzzy = true,
+    })
+end),
+```
+
+### Encryption (optional, recommended)
+
+You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
+
+#### Install and generate a key
+
+Install `age` and generate a key with:
 
 ```sh
 $ age-keygen -o key.txt
@@ -146,7 +197,9 @@ Public key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
 > If you prefer to use [GnuPG](https://gnupg.org/), generate a key pair: `gpg --full-generate-key`. Get the public key with `gpg --armor --export your_email@example.com`.
 > The private key is your email or key ID associated with the gpg key.
 
-4.2. Enable encryption in your Wezterm config:
+#### Enable encryption in your config
+
+Enable encryption in your Wezterm config:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -166,6 +219,8 @@ resurrect.state_manager.set_encryption({
 > [!TIP]
 > If the encryption provider is not found in your PATH (common issue for GUI apps on Mac OS), you can specify the absolute path to the executable.
 > e.g. `method = "/opt/homebrew/bin/age"`
+
+#### Custom encryption providers
 
 Alternate implementations are possible by providing your own `encrypt` and `decrypt` functions:
 
@@ -478,33 +533,6 @@ Here is an example of a json file:
       }
    ],
    "workspace":"workspace_name"
-}
-```
-
-### Delete a saved state file via. fuzzy finder
-
-You can use the fuzzy finder to delete a saved state file by adding a keybind to your config:
-
-```lua
-local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
-
-config.keys = {
-  -- ...
-  {
-    key = "d",
-    mods = "ALT",
-    action = wezterm.action_callback(function(win, pane)
-      resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
-          resurrect.state_manager.delete_state(id)
-        end,
-        {
-          title = "Delete State",
-          description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
-          fuzzy_description = "Search State to Delete: ",
-          is_fuzzy = true,
-        })
-    end),
-  },
 }
 ```
 

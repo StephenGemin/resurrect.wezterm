@@ -115,23 +115,15 @@ function pub.setup(config, opts)
 		end)
 	end
 
-	-- Keybindings for manual save/restore
+	-- Keybindings for manual save/restore/delete
 	if opts.keybindings ~= false then
-		local restore_opts = {
-			relative = true,
-			restore_text = true,
-			on_pane_restore = pub.tab_state.default_on_pane_restore,
-		}
-
 		config.keys = config.keys or {}
 
 		-- Alt+W: save workspace
 		table.insert(config.keys, {
 			key = "w",
 			mods = "ALT",
-			action = wezterm.action_callback(function(_win, _pane)
-				pub.state_manager.save_state(pub.workspace_state.get_workspace_state())
-			end),
+			action = pub.workspace_state.save_workspace_action(),
 		})
 
 		-- Alt+Shift+W: save window
@@ -148,29 +140,18 @@ function pub.setup(config, opts)
 			action = pub.tab_state.save_tab_action(),
 		})
 
-		-- Alt+R: fuzzy load saved state
+		-- Alt+R: fuzzy restore saved state
 		table.insert(config.keys, {
 			key = "r",
 			mods = "ALT",
-			action = wezterm.action_callback(function(win, pane)
-				pub.fuzzy_loader.fuzzy_load(win, pane, function(id, _label)
-					local state_type = id:match("^([^/\\]+)")
-					local name = id:match("[/\\](.+)$")
-					if name then
-						name = name:gsub("%.json$", "")
-					end
-					if state_type == "workspace" then
-						local state = pub.state_manager.load_state(name, "workspace")
-						pub.workspace_state.restore_workspace(state, restore_opts)
-					elseif state_type == "window" then
-						local state = pub.state_manager.load_state(name, "window")
-						pub.window_state.restore_window(pane:window(), state, restore_opts)
-					elseif state_type == "tab" then
-						local state = pub.state_manager.load_state(name, "tab")
-						pub.tab_state.restore_tab(pane:tab(), state, restore_opts)
-					end
-				end)
-			end),
+			action = pub.fuzzy_loader.restore_action(),
+		})
+
+		-- Alt+D: fuzzy delete saved state
+		table.insert(config.keys, {
+			key = "d",
+			mods = "ALT",
+			action = pub.fuzzy_loader.delete_action(),
 		})
 	end
 end

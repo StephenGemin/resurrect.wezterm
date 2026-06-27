@@ -254,6 +254,59 @@ local function insert_choices(stdout, opts)
 	return state_files
 end
 
+---Returns a wezterm action that opens a fuzzy picker and restores the chosen state.
+---Dispatches automatically to workspace/window/tab restore based on the picked entry.
+---Accepts the same restore_opts as restore_workspace/restore_window/restore_tab plus
+---an optional `fuzzy_load_opts` field to customise the picker itself.
+---@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table
+---@return table wezterm action
+function pub.restore_action(opts)
+	opts = opts or {}
+	local picker_opts = opts.fuzzy_load_opts
+	return wezterm.action_callback(function(win, pane)
+		local tab_state = require("resurrect.tab_state")
+		local restore_opts = utils.tbl_deep_extend("force", {
+			relative = true,
+			restore_text = true,
+			on_pane_restore = tab_state.default_on_pane_restore,
+		}, opts)
+		restore_opts.fuzzy_load_opts = nil
+		pub.fuzzy_load(win, pane, function(id, _label)
+			local state_manager = require("resurrect.state_manager")
+			local state_type = id:match("^([^/\\]+)")
+			local name = id:match("[/\\](.+)$")
+			if name then
+				name = name:gsub("%.json$", "")
+			end
+			if state_type == "workspace" then
+				local workspace_state = require("resurrect.workspace_state")
+				workspace_state.restore_workspace(state_manager.load_state(name, "workspace"), restore_opts)
+			elseif state_type == "window" then
+				local window_state = require("resurrect.window_state")
+				window_state.restore_window(pane:window(), state_manager.load_state(name, "window"), restore_opts)
+			elseif state_type == "tab" then
+				tab_state.restore_tab(pane:tab(), state_manager.load_state(name, "tab"), restore_opts)
+			end
+		end, picker_opts)
+	end)
+end
+
+---Returns a wezterm action that opens a fuzzy picker and deletes the chosen state file.
+---@param opts? fuzzy_load_opts picker customisation (same as fuzzy_load opts)
+---@return table wezterm action
+function pub.delete_action(opts)
+	local delete_opts = utils.tbl_deep_extend("force", {
+		title = "Delete Session",
+		description = "Select a session to delete  (Enter = delete, Esc = cancel, / = filter)",
+		is_fuzzy = true,
+	}, opts or {})
+	return wezterm.action_callback(function(win, pane)
+		pub.fuzzy_load(win, pane, function(id)
+			require("resurrect.state_manager").delete_state(id)
+		end, delete_opts)
+	end)
+end
+
 ---A fuzzy finder to restore saved state
 ---@param window MuxWindow
 ---@param pane Pane
