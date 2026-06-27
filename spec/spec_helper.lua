@@ -104,6 +104,9 @@ function M.new_wezterm(o)
 			end
 			return {}
 		end,
+		list = function()
+			return o.plugin_list or {}
+		end,
 	}
 
 	wz.mux = {
