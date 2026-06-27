@@ -85,7 +85,7 @@ function pub.setup(config, opts)
 			last_save_time = os.date("%H:%M:%S")
 		end)
 
-		wezterm.on("update-right-status", function(window, pane)
+		wezterm.on("update-right-status", function(window, _pane)
 			local titles = {}
 			local mux_win = window:mux_window()
 			for _, tab in ipairs(mux_win:tabs()) do
@@ -134,7 +134,7 @@ function pub.setup(config, opts)
 		table.insert(config.keys, {
 			key = "w",
 			mods = "ALT",
-			action = wezterm.action_callback(function(win, pane)
+			action = wezterm.action_callback(function(_win, _pane)
 				pub.state_manager.save_state(pub.workspace_state.get_workspace_state())
 			end),
 		})
@@ -158,7 +158,7 @@ function pub.setup(config, opts)
 			key = "r",
 			mods = "ALT",
 			action = wezterm.action_callback(function(win, pane)
-				pub.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
+				pub.fuzzy_loader.fuzzy_load(win, pane, function(id, _label)
 					local state_type = id:match("^([^/\\]+)")
 					local name = id:match("[/\\](.+)$")
 					if name then
