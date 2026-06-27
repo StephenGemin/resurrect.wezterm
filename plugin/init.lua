@@ -30,7 +30,7 @@ init()
 --- One-call setup that configures everything for session persistence.
 --- Users call this from their wezterm.lua:
 ---
----   local resurrect = wezterm.plugin.require("https://github.com/YedPool/resurrect.wezterm")
+---   local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 ---   resurrect.setup(config)  -- or resurrect.setup(config, opts)
 ---
 --- Options (all optional):

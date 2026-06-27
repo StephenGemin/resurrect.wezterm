@@ -1,8 +1,3 @@
-> [!WARNING]
-> This project is archived and no longer maintained. 
-> I'm currently focusing on my PhD and don't find it interesting to work on this anymore. 
-> Please fork/use one of the forks instead 😃
-
 # resurrect.wezterm
 
 Resurrect your terminal environment!⚰️ A plugin to save the state of your windows, tabs and panes. Inspired by [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) and [tmux-continuum](https://github.com/tmux-plugins/tmux-continuum).
@@ -23,19 +18,9 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 ```lua
 local wezterm = require("wezterm")
 local config = wezterm.config_builder()
-local resurrect = wezterm.plugin.require("https://github.com/YedPool/resurrect.wezterm")
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 
--- your existing config here (colors, fonts, shell, etc.); Only specify values that differ from the values below
-resurrect.setup(config, {
-  periodic_interval  = 300,   -- seconds between periodic saves (default: 5 min)
-  restore_delay      = 3,     -- seconds to wait before sending restore commands
-  save_workspaces    = true,  -- save workspace state
-  save_windows       = true,  -- save window state
-  save_tabs          = true,  -- save tab state
-  keybindings        = true,  -- add Alt+W/R/Shift+W/Shift+T bindings
-  status_bar         = true,  -- show save time + tab titles in right status
-  claude_hooks       = true,  -- auto-configure Claude Code SessionStart hook
-})
+-- your existing config here (colors, fonts, shell, etc.)
 
 resurrect.setup(config)
 
@@ -44,8 +29,22 @@ return config
 
 ### Setup Options
 
+All options are optional. Defaults are shown below:
 
-Set any option to `false` to disable that feature. For example, to skip keybindings and add your own:
+```lua
+resurrect.setup(config, {
+  periodic_interval = 300,  -- seconds between periodic saves
+  restore_delay     = 0,    -- seconds to wait before sending process-restore commands
+  save_workspaces   = true,
+  save_windows      = true,
+  save_tabs         = true,
+  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R bindings
+  status_bar        = true, -- show last save time and tab titles in the right status bar
+})
+```
+
+Set any option to `false` to disable that feature. For example, to skip the built-in
+keybindings and define your own:
 
 ```lua
 resurrect.setup(config, { keybindings = false })

@@ -2,7 +2,7 @@
 --
 -- These mirror the minimal user config documented in README:
 --
---   local resurrect = wezterm.plugin.require("https://github.com/YedPool/resurrect.wezterm")
+--   local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 --   resurrect.setup(config)
 --
 -- Each test loads init.lua the same way WezTerm does and then calls setup().
