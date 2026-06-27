@@ -114,8 +114,7 @@ action = resurrect.fuzzy_loader.restore_action({
 })
 ```
 
-<details>
-<summary>Manual dispatch (advanced)</summary>
+#### Manual dispatch
 
 If you need full control over how each state type is restored, call `fuzzy_load` directly:
 
@@ -145,8 +144,6 @@ action = wezterm.action_callback(function(win, pane)
   end)
 end),
 ```
-
-</details>
 
 ### Encryption (optional, recommended)
 
