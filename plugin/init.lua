@@ -27,8 +27,8 @@ end
 
 init()
 
---- One-call setup that configures everything for session persistence
---- and Claude Code restoration. Users call this from their wezterm.lua:
+--- One-call setup that configures everything for session persistence.
+--- Users call this from their wezterm.lua:
 ---
 ---   local resurrect = wezterm.plugin.require("https://github.com/YedPool/resurrect.wezterm")
 ---   resurrect.setup(config)  -- or resurrect.setup(config, opts)
