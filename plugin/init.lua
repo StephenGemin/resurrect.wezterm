@@ -1,5 +1,15 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 
+-- Restore package.path so sub-modules under plugin/resurrect/ can be required.
+-- wezterm.plugin.require() does not add the plugin dir to package.path automatically.
+local sep = package.config:sub(1, 1)
+for _, plugin in ipairs(wezterm.plugin.list()) do
+	if plugin.url:find("resurrect", 1, true) then
+		package.path = plugin.plugin_dir .. sep .. "plugin" .. sep .. "?.lua;" .. package.path
+		break
+	end
+end
+
 local pub = {}
 
 local function init()
