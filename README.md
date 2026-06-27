@@ -53,11 +53,13 @@ resurrect.setup(config, { keybindings = false })
 config.keys = { ... }
 ```
 
-## Advanced Setup (Manual Configuration)
+## Advanced Setup
 
 If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
 
-1. Saving workspace, window and/or tab state based on name and title:
+### Saving state
+
+Save workspace, window and/or tab state based on name and title:
 
 ```lua
 local wezterm = require("wezterm")
@@ -83,7 +85,9 @@ config.keys = {
 }
 ```
 
-2. Loading workspace or window state via. fuzzy finder:
+### Loading state
+
+Load workspace or window state via. fuzzy finder:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -144,10 +148,13 @@ end),
 
 </details>
 
-3. Optional, enable encryption (recommended):
-   You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
+### Encryption (optional, recommended)
 
-4.1. Install `age` and generate a key with:
+You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
+
+#### Install and generate a key
+
+Install `age` and generate a key with:
 
 ```sh
 $ age-keygen -o key.txt
@@ -158,7 +165,9 @@ Public key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
 > If you prefer to use [GnuPG](https://gnupg.org/), generate a key pair: `gpg --full-generate-key`. Get the public key with `gpg --armor --export your_email@example.com`.
 > The private key is your email or key ID associated with the gpg key.
 
-4.2. Enable encryption in your Wezterm config:
+#### Enable encryption in your config
+
+Enable encryption in your Wezterm config:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -178,6 +187,8 @@ resurrect.state_manager.set_encryption({
 > [!TIP]
 > If the encryption provider is not found in your PATH (common issue for GUI apps on Mac OS), you can specify the absolute path to the executable.
 > e.g. `method = "/opt/homebrew/bin/age"`
+
+#### Custom encryption providers
 
 Alternate implementations are possible by providing your own `encrypt` and `decrypt` functions:
 
