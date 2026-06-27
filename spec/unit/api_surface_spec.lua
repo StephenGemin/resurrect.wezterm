@@ -53,18 +53,7 @@ describe("public API surface (README contract)", function()
 	end
 
 	it("init.lua wires the submodules under the README names", function()
-		-- README uses `resurrect.state_manager`, `resurrect.workspace_state`, etc.
-		-- where `resurrect` is the table init.lua returns. Mock the dev.wezterm
-		-- dependency so init() runs without network access.
-		local wz = helper.new_wezterm({
-			plugin_require = function()
-				return {
-					setup = function()
-						return "/tmp/resurrect-test"
-					end,
-				}
-			end,
-		})
+		local wz = helper.new_wezterm()
 		local resurrect = helper.load("init", wz)
 
 		assert.are.equal("function", type(resurrect.state_manager.save_state))

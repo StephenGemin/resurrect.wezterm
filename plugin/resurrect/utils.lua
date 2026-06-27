@@ -6,6 +6,23 @@ utils.is_windows = wezterm.target_triple == "x86_64-pc-windows-msvc"
 utils.is_mac = (wezterm.target_triple == "x86_64-apple-darwin" or wezterm.target_triple == "aarch64-apple-darwin")
 utils.separator = utils.is_windows and "\\" or "/"
 
+---Returns the platform-appropriate directory for persisting resurrect.wezterm state.
+---Respects XDG_DATA_HOME on Linux; uses Application Support on macOS;
+---uses %APPDATA% on Windows. Always ends with the platform path separator.
+---@return string
+function utils.platform_default_state_dir()
+	local home = wezterm.home_dir
+	if utils.is_windows then
+		local appdata = os.getenv("APPDATA") or (home .. "\\AppData\\Roaming")
+		return appdata .. "\\wezterm\\resurrect\\"
+	elseif utils.is_mac then
+		return home .. "/Library/Application Support/wezterm/resurrect/"
+	else
+		local xdg = os.getenv("XDG_DATA_HOME") or (home .. "/.local/share")
+		return xdg .. "/wezterm/resurrect/"
+	end
+end
+
 -- Helper function to remove formatting esc sequences in the string
 ---@param str string
 ---@return string

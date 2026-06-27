@@ -5,6 +5,7 @@ end
 -- Minimal wezterm stub.
 local wezterm_stub = {
   target_triple = is_windows() and "x86_64-pc-windows-msvc" or "x86_64-unknown-linux-gnu",
+  home_dir = is_windows() and "C:\\Users\\testuser" or "/home/testuser",
   emit = function() end,
 }
 _G.wezterm = wezterm_stub
@@ -38,8 +39,8 @@ package.path = table.concat(search_paths, ";") .. ";" .. package.path
 local state_manager = require("resurrect.state_manager")
 
 local sep = is_windows() and "\\" or "/"
--- save_state_dir carries a trailing separator by convention (set that way in
--- init.lua and relied on by delete_state), so base ends with `sep` here too.
+-- _save_state_dir must carry a trailing separator (relied on by delete_state
+-- and the path format in get_file_path), so base ends with `sep` here too.
 local base = (
   is_windows() and ((os.getenv("TEMP") or os.getenv("TMP") or "C:\\Temp") .. "\\resurrect_sm_test")
   or "/tmp/resurrect_sm_test"
@@ -51,7 +52,7 @@ local base = (
 describe("state_manager path construction (via load_state)", function()
   before_each(function()
     last_load_path = nil
-    state_manager.save_state_dir = base
+    state_manager.change_state_save_dir(base)
   end)
 
   it("builds <save_state_dir><type>/<name>.json without doubling the separator", function()

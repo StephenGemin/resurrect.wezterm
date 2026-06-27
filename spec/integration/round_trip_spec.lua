@@ -21,6 +21,14 @@ local function make_tmpdir()
 	return base
 end
 
+-- Like make_tmpdir but intentionally omits the type subdirectories.
+-- Used to verify that save_state creates them on demand.
+local function make_tmpdir_no_subdirs()
+	local base = "/tmp/resurrect_rt_nosub_" .. tostring(os.time()) .. "_" .. tostring(math.random(10000))
+	os.execute("mkdir -p " .. base)
+	return base
+end
+
 local function load_state_manager(tmpdir)
 	local wz = helper.new_wezterm({
 		patch = function(w, _)
@@ -36,7 +44,7 @@ local function load_state_manager(tmpdir)
 		end,
 	})
 	local sm = helper.load("resurrect.state_manager", wz)
-	sm.save_state_dir = tmpdir .. sep
+	sm.change_state_save_dir(tmpdir .. sep)
 	return sm
 end
 
@@ -109,5 +117,57 @@ describe("save_state → load_state round-trip (real filesystem)", function()
 
 		f = io.open(full_path, "r")
 		assert.is_nil(f, "file should be removed after delete_state")
+	end)
+end)
+
+-- Regression guard: save_state must create type subdirectories on demand.
+-- If directory creation is moved back to require-time or change_state_save_dir,
+-- it triggers "attempt to yield across a C-call boundary" and crashes wezterm
+-- on every startup. This test proves the subdirectory is created lazily by
+-- save_state itself, with no pre-existing workspace/window/tab dirs.
+describe("save_state: lazy directory creation (regression: no C-call-boundary crash)", function()
+	local state_manager, nosub_dir
+
+	before_each(function()
+		math.randomseed(os.time())
+		nosub_dir = make_tmpdir_no_subdirs()
+		state_manager = load_state_manager(nosub_dir)
+	end)
+
+	after_each(function()
+		os.execute("rm -rf " .. nosub_dir)
+	end)
+
+	it("creates workspace/ subdir and writes the file when it did not previously exist", function()
+		local expected = nosub_dir .. sep .. "workspace" .. sep .. "lazydir.json"
+
+		local before = io.open(nosub_dir .. sep .. "workspace", "r")
+		assert.is_nil(before, "precondition: workspace/ must not exist before save_state")
+
+		state_manager.save_state({ workspace = "lazydir", window_states = {} })
+
+		local f = io.open(expected, "r")
+		assert.not_nil(f, "save_state must create workspace/ and write the file")
+		if f then f:close() end
+	end)
+
+	it("creates window/ subdir and writes the file when it did not previously exist", function()
+		local expected = nosub_dir .. sep .. "window" .. sep .. "lazywin.json"
+
+		state_manager.save_state({ title = "lazywin", tabs = {} })
+
+		local f = io.open(expected, "r")
+		assert.not_nil(f, "save_state must create window/ and write the file")
+		if f then f:close() end
+	end)
+
+	it("creates tab/ subdir and writes the file when it did not previously exist", function()
+		local expected = nosub_dir .. sep .. "tab" .. sep .. "lazytab.json"
+
+		state_manager.save_state({ title = "lazytab", pane_tree = {} })
+
+		local f = io.open(expected, "r")
+		assert.not_nil(f, "save_state must create tab/ and write the file")
+		if f then f:close() end
 	end)
 end)

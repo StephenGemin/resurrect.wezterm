@@ -12,7 +12,7 @@ describe("state_manager.load_state", function()
 	before_each(function()
 		local wz = helper.new_wezterm()
 		state_manager = helper.load("resurrect.state_manager", wz)
-		state_manager.save_state_dir = "/states/"
+		state_manager.change_state_save_dir("/states/")
 		file_io = require("resurrect.file_io")
 	end)
 
