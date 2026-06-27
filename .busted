@@ -1,16 +1,14 @@
 return {
-	-- Default (plain `busted` with no args) runs unit tests only.
+	-- Default (plain `busted` with no args) runs all.
 	default = {
 		lpath = "./plugin/?.lua;./spec/?.lua",
 		pattern = "_spec",
 		ROOT = { "spec" },
-		exclude_pattern = "integration",
 	},
 	unit = {
 		lpath = "./plugin/?.lua;./spec/?.lua",
 		pattern = "_spec",
-		ROOT = { "spec" },
-		exclude_pattern = "integration",
+		ROOT = { "spec/unit" },
 	},
 	integration = {
 		lpath = "./plugin/?.lua;./spec/?.lua",
