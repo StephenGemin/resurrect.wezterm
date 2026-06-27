@@ -145,6 +145,41 @@ action = wezterm.action_callback(function(win, pane)
 end),
 ```
 
+### Deleting state
+
+You can use the fuzzy finder to delete a saved state file by adding a keybind to your config:
+
+```lua
+local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
+
+config.keys = {
+  -- ...
+  {
+    key = "d",
+    mods = "ALT",
+    action = resurrect.fuzzy_loader.delete_action(),
+  },
+}
+```
+
+`delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` to customise the picker title, description, etc.
+
+#### Manual dispatch
+
+```lua
+action = wezterm.action_callback(function(win, pane)
+  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
+      resurrect.state_manager.delete_state(id)
+    end,
+    {
+      title = "Delete State",
+      description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
+      fuzzy_description = "Search State to Delete: ",
+      is_fuzzy = true,
+    })
+end),
+```
+
 ### Encryption (optional, recommended)
 
 You can optionally configure the plugin to encrypt and decrypt the saved state. [age](https://github.com/FiloSottile/age) is the default encryption provider. [Rage](https://github.com/str4d/rage) and [GnuPG](https://gnupg.org/) encryption are also supported.
@@ -500,44 +535,6 @@ Here is an example of a json file:
    "workspace":"workspace_name"
 }
 ```
-
-### Delete a saved state file via. fuzzy finder
-
-You can use the fuzzy finder to delete a saved state file by adding a keybind to your config:
-
-```lua
-local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
-
-config.keys = {
-  -- ...
-  {
-    key = "d",
-    mods = "ALT",
-    action = resurrect.fuzzy_loader.delete_action(),
-  },
-}
-```
-
-`delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` to customise the picker title, description, etc.
-
-<details>
-<summary>Manual dispatch (advanced)</summary>
-
-```lua
-action = wezterm.action_callback(function(win, pane)
-  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
-      resurrect.state_manager.delete_state(id)
-    end,
-    {
-      title = "Delete State",
-      description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
-      fuzzy_description = "Search State to Delete: ",
-      is_fuzzy = true,
-    })
-end),
-```
-
-</details>
 
 ## Augmenting the command palette
 
