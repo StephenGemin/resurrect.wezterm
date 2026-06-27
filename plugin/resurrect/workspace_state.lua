@@ -1,5 +1,6 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local window_state_mod = require("resurrect.window_state")
+local state_manager_mod = require("resurrect.state_manager")
 
 local pub = {}
 
@@ -71,6 +72,15 @@ function pub.restore_workspace(workspace_state, opts)
 	end
 
 	wezterm.emit("resurrect.workspace_state.restore_workspace.finished")
+end
+
+---Returns a wezterm action that saves the current workspace state.
+---Mirrors save_window_action() and save_tab_action() for use in custom key tables.
+---@return table wezterm action
+function pub.save_workspace_action()
+	return wezterm.action_callback(function(_win, _pane)
+		state_manager_mod.save_state(pub.get_workspace_state())
+	end)
 end
 
 ---Returns the state of the current workspace

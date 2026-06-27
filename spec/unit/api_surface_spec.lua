@@ -24,6 +24,7 @@ describe("public API surface (README contract)", function()
 		["resurrect.workspace_state"] = {
 			get_workspace_state = "function",
 			restore_workspace = "function",
+			save_workspace_action = "function",
 		},
 		["resurrect.window_state"] = {
 			get_window_state = "function",
@@ -38,6 +39,8 @@ describe("public API surface (README contract)", function()
 		},
 		["resurrect.fuzzy_loader"] = {
 			fuzzy_load = "function",
+			restore_action = "function",
+			delete_action = "function",
 		},
 	}
 
