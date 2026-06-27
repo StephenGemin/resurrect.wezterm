@@ -20,7 +20,7 @@ ensure_path("./spec/?.lua")
 
 -- Forget every cached plugin module (and the wezterm mock) so the next require
 -- re-runs the module body against a fresh mock. Without this, module-level state
--- such as `file_io.encryption` or `state_manager.save_state_dir` would leak
+-- such as `file_io.encryption` would leak
 -- between tests.
 local function reset_loaded()
 	for name in pairs(package.loaded) do
@@ -40,6 +40,7 @@ function M.new_wezterm(o)
 
 	local wz = { _rec = rec }
 	wz.target_triple = o.target_triple or "x86_64-unknown-linux-gnu"
+	wz.home_dir = o.home_dir or "/home/testuser"
 	wz.nerdfonts = setmetatable({}, {
 		__index = function()
 			return ""

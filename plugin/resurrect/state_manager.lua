@@ -3,6 +3,7 @@ local file_io = require("resurrect.file_io")
 local utils = require("resurrect.utils")
 
 local pub = {}
+local _save_state_dir = utils.platform_default_state_dir()
 
 ---@param file_name string
 ---@param type string
@@ -12,12 +13,12 @@ local function get_file_path(file_name, type, opt_name)
 	if opt_name then
 		file_name = opt_name
 	end
-	-- save_state_dir carries a trailing separator (see init.lua), so the format
-	-- string must not add one between it and `type` -- doing so yields a double
-	-- separator (e.g. /states//workspace/...).
+	-- _save_state_dir carries a trailing separator (set by change_state_save_dir
+	-- or defaulted by platform_default_state_dir), so the format string must not
+	-- add one between it and `type` -- doing so yields a double separator.
 	return string.format(
 		"%s%s" .. utils.separator .. "%s.json",
-		pub.save_state_dir,
+		_save_state_dir,
 		type,
 		file_name:gsub("[" .. utils.separator .. ":%[%]?/*~!{}()&|;<>$`\"' \0]", "+")
 	)
@@ -28,10 +29,13 @@ end
 ---@param opt_name? string
 function pub.save_state(state, opt_name)
 	if state.window_states then
+		utils.ensure_folder_exists(_save_state_dir .. "workspace")
 		file_io.write_state(get_file_path(state.workspace, "workspace", opt_name), state, "workspace")
 	elseif state.tabs then
+		utils.ensure_folder_exists(_save_state_dir .. "window")
 		file_io.write_state(get_file_path(state.title, "window", opt_name), state, "window")
 	elseif state.pane_tree then
+		utils.ensure_folder_exists(_save_state_dir .. "tab")
 		file_io.write_state(get_file_path(state.title, "tab", opt_name), state, "tab")
 	end
 end
@@ -187,7 +191,7 @@ end
 ---@return boolean
 ---@return string|nil
 function pub.write_current_state(name, type)
-	local file_path = pub.save_state_dir .. utils.separator .. "current_state"
+	local file_path = _save_state_dir .. utils.separator .. "current_state"
 	local suc, err = file_io.write_file(file_path, string.format("%s\n%s", name, type))
 	return suc, err
 end
@@ -196,7 +200,7 @@ end
 ---@return boolean
 ---@return string|nil
 function pub.resurrect_on_gui_startup()
-	local file_path = pub.save_state_dir .. utils.separator .. "current_state"
+	local file_path = _save_state_dir .. utils.separator .. "current_state"
 	local suc, err = pcall(function()
 		local file = io.open(file_path, "r")
 		if not file then
@@ -231,7 +235,7 @@ function pub.delete_state(file_path)
 		wezterm.emit("resurrect.error", "Invalid path: directory traversal not allowed")
 		return
 	end
-	local path = pub.save_state_dir .. file_path
+	local path = _save_state_dir .. file_path
 	local success = os.remove(path)
 	if not success then
 		wezterm.emit("resurrect.error", "Failed to delete state: " .. path)
@@ -249,11 +253,7 @@ end
 ---Changes the directory to save the state to
 ---@param directory string
 function pub.change_state_save_dir(directory)
-	local types = { "workspace", "window", "tab" }
-	for _, type in ipairs(types) do
-		utils.ensure_folder_exists(directory .. utils.separator .. type)
-	end
-	pub.save_state_dir = directory
+	_save_state_dir = directory
 end
 
 function pub.set_max_nlines(max_nlines)

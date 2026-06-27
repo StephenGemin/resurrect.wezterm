@@ -11,9 +11,7 @@ describe("state_manager.save_state", function()
 	before_each(function()
 		local wz = helper.new_wezterm()
 		state_manager = helper.load("resurrect.state_manager", wz)
-		-- Pin a known directory instead of going through change_state_save_dir (which
-		-- would touch the filesystem); save_state only reads save_state_dir.
-		state_manager.save_state_dir = "/states/"
+		state_manager.change_state_save_dir("/states/")
 
 		-- Capture what would be written without hitting disk or JSON encoding.
 		file_io = require("resurrect.file_io")
