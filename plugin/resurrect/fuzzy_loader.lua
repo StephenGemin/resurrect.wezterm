@@ -259,10 +259,10 @@ end
 ---Accepts the same restore_opts as restore_workspace/restore_window/restore_tab plus
 ---an optional `fuzzy_load_opts` field to customise the picker itself.
 ---
----Set `current_window = true` to restore a workspace in place into the window the
----picker was invoked from, instead of spawning a new window (the default).
+---By default, workspace restores happen in place into the window the picker was invoked
+---from. Set `current_window = false` to spawn a new window instead.
 ---`current_window` is ignored for window and tab restores.
----@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table; pass `current_window = true` for in-place workspace restore
+---@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table; set `current_window = false` to spawn a new window for workspace restores
 ---@return table wezterm action
 function pub.restore_action(opts)
 	opts = opts or {}
