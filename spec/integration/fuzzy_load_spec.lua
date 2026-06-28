@@ -1,22 +1,9 @@
--- Integration tests for fuzzy_loader.fuzzy_load.
---
--- Verifies that:
---   1. state_manager.save_state_dir is reachable so find_json_files_recursive
---      receives a non-nil path (regression: field was private and fuzzy_load
---      crashed with "attempt to index a nil value (local 'base_path')").
---   2. insert_choices correctly parses the file listing into picker entries.
---
--- wezterm.run_child_process is stubbed so no real shell commands are run; all
--- other behaviour (insert_choices, InputSelector assembly) uses the real code.
-
 local helper = require("spec_helper")
 
 local sep = package.config:sub(1, 1) == "\\" and "\\" or "/"
 local FAKE_DIR = "/tmp/resurrect_fl_test"
 
--- Build "epoch filepath" stdout matching the format produced by the shell find
--- commands in find_json_files_recursive.  The pattern insert_choices expects:
---   %s*(%d+)%s+.+[/\]<type>[/\]<file>.json$
+-- Produces "epoch filepath" lines in the format find_json_files_recursive returns.
 local function make_stdout(entries)
 	local lines = {}
 	for _, e in ipairs(entries) do
@@ -36,15 +23,6 @@ local function make_window()
 	return window, {}, captured
 end
 
--- wezterm.format returns "" in the mock, which makes the label-length cost
--- calculation go negative and insert_choices returns early with an empty list.
--- Pass identity format functions so costs are 0 and max_length is computed correctly.
-local PLAIN_OPTS = {
-	fmt_workspace = function(label) return label end,
-	fmt_window = function(label) return label end,
-	fmt_tab = function(label) return label end,
-}
-
 local function setup(stdout)
 	local wz, rec = helper.new_wezterm({
 		patch = function(w, _)
@@ -54,12 +32,20 @@ local function setup(stdout)
 		end,
 	})
 	local fuzzy_loader = helper.load("resurrect.fuzzy_loader", wz)
-	-- require after helper.load so state_manager shares the same wz mock and
-	-- is already cached when fuzzy_load calls require("resurrect.state_manager").
+	-- Load state_manager after fuzzy_loader so it shares the same wz mock and
+	-- is cached before fuzzy_load calls require("resurrect.state_manager").
 	local state_manager = require("resurrect.state_manager")
 	state_manager.change_state_save_dir(FAKE_DIR .. sep)
 	return fuzzy_loader, state_manager, rec
 end
+
+-- wezterm.format returns "" in the mock, making the label-length cost negative
+-- and causing insert_choices to return early. Identity functions keep costs at 0.
+local PLAIN_OPTS = {
+	fmt_workspace = function(label) return label end,
+	fmt_window = function(label) return label end,
+	fmt_tab = function(label) return label end,
+}
 
 describe("fuzzy_load: file discovery", function()
 	it("emits resurrect.error and still opens the picker when no state files exist", function()
