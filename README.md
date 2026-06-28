@@ -29,34 +29,19 @@ return config
 
 ### Setup Options
 
-All options are optional. Defaults are shown below:
+`setup()` handles autosave, startup restore, status bar, and keybindings — no hand-rolled
+callbacks needed. All options are optional:
 
 ```lua
 resurrect.setup(config, {
-  periodic_interval = 300,  -- seconds between periodic saves
-  restore_delay     = 0,    -- seconds to wait before sending process-restore commands
+  periodic_interval = 300,   -- seconds between periodic saves
+  restore_delay     = 0,     -- seconds to wait before sending process-restore commands
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
-  keybindings       = true, -- add Alt+W/S/Shift+W/Shift+T/R/D bindings
-  status_bar        = true, -- show last save time and tab titles in the right status bar
+  keybindings       = true,  -- Alt+W/S/Shift+W/Shift+T/R/D bindings; set false to use your own
+  status_bar        = true,  -- show last save time and tab titles in the right status bar
 })
-```
-
-Set any option to `false` to disable that feature. For example, to skip the built-in
-keybindings and use your own:
-
-```lua
-resurrect.setup(config, { keybindings = false })
-
-config.keys = {
-  { key = "S", mods = "LEADER", action = resurrect.workspace_state.save_workspace_action() },
-  { key = "R", mods = "LEADER", action = resurrect.fuzzy_loader.restore_action() },
-  { key = "D", mods = "LEADER", action = resurrect.fuzzy_loader.delete_action() },
-}
-```
-
-The action helpers handle all dispatch logic internally — no hand-rolled callbacks needed.
 
 ## Advanced Setup
 
