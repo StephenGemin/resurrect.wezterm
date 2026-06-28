@@ -44,14 +44,19 @@ resurrect.setup(config, {
 ```
 
 Set any option to `false` to disable that feature. For example, to skip the built-in
-keybindings and define your own:
+keybindings and use your own:
 
 ```lua
 resurrect.setup(config, { keybindings = false })
 
--- Add your own custom bindings here
-config.keys = { ... }
+config.keys = {
+  { key = "S", mods = "LEADER", action = resurrect.workspace_state.save_workspace_action() },
+  { key = "R", mods = "LEADER", action = resurrect.fuzzy_loader.restore_action() },
+  { key = "D", mods = "LEADER", action = resurrect.fuzzy_loader.delete_action() },
+}
 ```
+
+The action helpers handle all dispatch logic internally — no hand-rolled callbacks needed.
 
 ## Advanced Setup
 
