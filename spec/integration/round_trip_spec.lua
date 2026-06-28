@@ -36,7 +36,7 @@ local function load_state_manager(tmpdir)
 			w.json_parse = function(s) return lunajson.decode(s) end
 			w.run_child_process = function(args)
 				if args[1] == "mkdir" then
-					local rc = os.execute("mkdir -p " .. args[2])
+					local rc = os.execute("mkdir -p " .. args[3])
 					return (rc == 0 or rc == true), "", ""
 				end
 				return true, "", ""

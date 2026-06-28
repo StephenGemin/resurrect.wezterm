@@ -100,7 +100,10 @@ local function shell_mkdir(path)
 		end
 		return os.execute('mkdir "' .. path .. '"')
 	else
-		local success, _, _ = wezterm.run_child_process({ "mkdir", path })
+		-- -p: create all missing parents in one shot and succeed if dir already exists.
+		-- wezterm.run_child_process passes path as a direct argv element (no shell),
+		-- so special characters in path cannot cause injection.
+		local success, _, _ = wezterm.run_child_process({ "mkdir", "-p", path })
 		return success
 	end
 end
@@ -188,13 +191,19 @@ local function mkdir_if_missing(path)
 end
 
 -- Create the folder if it does not exist.
--- Drive-relative paths on Windows (e.g. C:foo\bar) are normalised to absolute
--- from the drive root (C:\foo\bar). UNC paths (\\server\share\...) are
--- supported only when the server and share components already exist.
+-- On Unix, delegates to `mkdir -p` which creates all missing parents in one
+-- shot and is idempotent.
+-- On Windows, `mkdir` requires each parent to already exist, so we iterate
+-- component by component. Drive-relative paths (e.g. C:foo\bar) are
+-- normalised to absolute. UNC paths (\\server\share\...) are supported only
+-- when the server and share already exist.
 -- Path components are not sanitized; . and .. segments produce undefined behavior.
 ---@param path string
 ---@return boolean success
 function utils.ensure_folder_exists(path)
+	if not utils.is_windows then
+		return shell_mkdir(path) and dir_is_accessible(path)
+	end
 	local sep, root, stripped = parse_root(path)
 	local current = root
 	for part in string.gmatch(stripped, "[^" .. sep .. "]+") do
