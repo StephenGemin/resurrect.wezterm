@@ -115,7 +115,7 @@ function pub.setup(config, opts)
 		end)
 	end
 
-	-- Keybindings for manual save/restore/delete
+	-- Default keybindings for save/restore/delete
 	if opts.keybindings ~= false then
 		config.keys = config.keys or {}
 
@@ -144,7 +144,7 @@ function pub.setup(config, opts)
 		table.insert(config.keys, {
 			key = "r",
 			mods = "ALT",
-			action = pub.fuzzy_loader.restore_action(),
+			action = pub.fuzzy_loader.restore_action({ current_window = true }),
 		})
 
 		-- Alt+D: fuzzy delete saved state

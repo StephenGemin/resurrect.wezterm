@@ -280,7 +280,8 @@ function pub.restore_action(opts)
 		-- Resolve current_window to the MuxWindow here, at invocation time, since
 		-- MuxWindow objects only exist inside a callback — not at config time where
 		-- restore_action() is called.
-		if restore_opts.current_window then
+		-- false opts out to spawn-a-new-window; any other value (including nil) restores in place.
+		if restore_opts.current_window ~= false then
 			restore_opts.window = pane:window()
 		end
 		restore_opts.current_window = nil
