@@ -258,6 +258,10 @@ end
 ---Dispatches automatically to workspace/window/tab restore based on the picked entry.
 ---Accepts the same restore_opts as restore_workspace/restore_window/restore_tab plus
 ---an optional `fuzzy_load_opts` field to customise the picker itself.
+---
+---For workspace restores you may set `window = "current"` to restore in place into
+---the window the picker was invoked from, instead of spawning a new window into the
+---saved workspace. Omitting `window` keeps the default spawn-a-new-window behaviour.
 ---@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table
 ---@return table wezterm action
 function pub.restore_action(opts)
@@ -265,27 +269,47 @@ function pub.restore_action(opts)
 	local picker_opts = opts.fuzzy_load_opts
 	return wezterm.action_callback(function(win, pane)
 		local tab_state = require("resurrect.tab_state")
+		local state_manager = require("resurrect.state_manager")
 		local restore_opts = utils.tbl_deep_extend("force", {
 			relative = true,
 			restore_text = true,
 			on_pane_restore = tab_state.default_on_pane_restore,
 		}, opts)
 		restore_opts.fuzzy_load_opts = nil
-		pub.fuzzy_load(win, pane, function(id, _label)
-			local state_manager = require("resurrect.state_manager")
-			local state_type = id:match("^([^/\\]+)")
-			local name = id:match("[/\\](.+)$")
-			if name then
-				name = name:gsub("%.json$", "")
-			end
-			if state_type == "workspace" then
-				local workspace_state = require("resurrect.workspace_state")
-				workspace_state.restore_workspace(state_manager.load_state(name, "workspace"), restore_opts)
-			elseif state_type == "window" then
-				local window_state = require("resurrect.window_state")
-				window_state.restore_window(pane:window(), state_manager.load_state(name, "window"), restore_opts)
-			elseif state_type == "tab" then
+
+		-- `window = "current"` anchors a workspace restore to the window the picker
+		-- was invoked from. Resolved here because the MuxWindow only exists now;
+		-- window/tab restores ignore restore_opts.window, so it is a no-op for them.
+		if restore_opts.window == "current" then
+			restore_opts.window = pane:window()
+		end
+
+		-- One restorer per state type, so the picker callback is a flat lookup
+		-- instead of an if/elseif chain.
+		local restorers = {
+			workspace = function(name)
+				require("resurrect.workspace_state").restore_workspace(
+					state_manager.load_state(name, "workspace"),
+					restore_opts
+				)
+			end,
+			window = function(name)
+				require("resurrect.window_state").restore_window(
+					pane:window(),
+					state_manager.load_state(name, "window"),
+					restore_opts
+				)
+			end,
+			tab = function(name)
 				tab_state.restore_tab(pane:tab(), state_manager.load_state(name, "tab"), restore_opts)
+			end,
+		}
+
+		pub.fuzzy_load(win, pane, function(id, _label)
+			local restorer = restorers[id:match("^([^/\\]+)")]
+			local name = id:match("[/\\](.+)$")
+			if restorer and name then
+				restorer((name:gsub("%.json$", "")))
 			end
 		end, picker_opts)
 	end)

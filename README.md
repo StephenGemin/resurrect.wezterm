@@ -114,6 +114,14 @@ action = resurrect.fuzzy_loader.restore_action({
 })
 ```
 
+When restoring a **workspace**, `restore_action` spawns a new window into the saved
+workspace by default. Set `window = "current"` to restore in place into the window the
+picker was invoked from instead:
+
+```lua
+action = resurrect.fuzzy_loader.restore_action({ window = "current" })
+```
+
 #### Manual dispatch
 
 If you need full control over how each state type is restored, call `fuzzy_load` directly:
