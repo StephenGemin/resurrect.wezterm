@@ -42,6 +42,19 @@ resurrect.setup(config, {
   keybindings       = true,  -- Alt+W/S/Shift+W/Shift+T/R/D bindings; set false to use your own
   status_bar        = true,  -- show last save time and tab titles in the right status bar
 })
+```
+
+To use your own keybindings, set `keybindings = false` and add them to your config:
+
+```lua
+resurrect.setup(config, { keybindings = false })
+
+config.keys = {
+  { key = "s", mods = "ALT", action = resurrect.workspace_state.save_workspace_action() },
+  { key = "r", mods = "ALT", action = resurrect.fuzzy_loader.restore_action() },
+  { key = "d", mods = "ALT", action = resurrect.fuzzy_loader.delete_action() },
+}
+```
 
 ## Advanced Setup
 
