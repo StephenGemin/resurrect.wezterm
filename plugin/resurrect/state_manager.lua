@@ -4,6 +4,9 @@ local utils = require("resurrect.utils")
 
 local pub = {}
 local _save_state_dir = utils.platform_default_state_dir()
+-- pub.save_state_dir is part of the public API: fuzzy_loader reads it to locate
+-- state files. Keep it in sync with _save_state_dir via change_state_save_dir —
+-- do not remove or rename without updating fuzzy_loader.fuzzy_load.
 pub.save_state_dir = _save_state_dir
 
 ---@param file_name string
