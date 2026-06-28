@@ -115,11 +115,11 @@ action = resurrect.fuzzy_loader.restore_action({
 ```
 
 When restoring a **workspace**, `restore_action` spawns a new window into the saved
-workspace by default. Set `window = "current"` to restore in place into the window the
+workspace by default. Set `current_window = true` to restore in place into the window the
 picker was invoked from instead:
 
 ```lua
-action = resurrect.fuzzy_loader.restore_action({ window = "current" })
+action = resurrect.fuzzy_loader.restore_action({ current_window = true })
 ```
 
 #### Manual dispatch

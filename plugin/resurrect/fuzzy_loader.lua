@@ -259,10 +259,10 @@ end
 ---Accepts the same restore_opts as restore_workspace/restore_window/restore_tab plus
 ---an optional `fuzzy_load_opts` field to customise the picker itself.
 ---
----For workspace restores you may set `window = "current"` to restore in place into
----the window the picker was invoked from, instead of spawning a new window into the
----saved workspace. Omitting `window` keeps the default spawn-a-new-window behaviour.
----@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table
+---Set `current_window = true` to restore a workspace in place into the window the
+---picker was invoked from, instead of spawning a new window (the default).
+---`current_window` is ignored for window and tab restores.
+---@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table; pass `current_window = true` for in-place workspace restore
 ---@return table wezterm action
 function pub.restore_action(opts)
 	opts = opts or {}
@@ -277,12 +277,13 @@ function pub.restore_action(opts)
 		}, opts)
 		restore_opts.fuzzy_load_opts = nil
 
-		-- `window = "current"` anchors a workspace restore to the window the picker
-		-- was invoked from. Resolved here because the MuxWindow only exists now;
-		-- window/tab restores ignore restore_opts.window, so it is a no-op for them.
-		if restore_opts.window == "current" then
+		-- Resolve current_window to the MuxWindow here, at invocation time, since
+		-- MuxWindow objects only exist inside a callback — not at config time where
+		-- restore_action() is called.
+		if restore_opts.current_window then
 			restore_opts.window = pane:window()
 		end
+		restore_opts.current_window = nil
 
 		-- One restorer per state type, so the picker callback is a flat lookup
 		-- instead of an if/elseif chain.
