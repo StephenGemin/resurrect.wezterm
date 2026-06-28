@@ -126,6 +126,17 @@ function pub.setup(config, opts)
 			action = pub.workspace_state.save_workspace_action(),
 		})
 
+		-- Alt+S: save workspace + current window
+		table.insert(config.keys, {
+			key = "s",
+			mods = "ALT",
+			action = wezterm.action_callback(function(win, _pane)
+				local state_manager = require("resurrect.state_manager")
+				state_manager.save_state(pub.workspace_state.get_workspace_state())
+				state_manager.save_state(pub.window_state.get_window_state(win:mux_window()))
+			end),
+		})
+
 		-- Alt+Shift+W: save window
 		table.insert(config.keys, {
 			key = "W",
@@ -144,7 +155,7 @@ function pub.setup(config, opts)
 		table.insert(config.keys, {
 			key = "r",
 			mods = "ALT",
-			action = pub.fuzzy_loader.restore_action({ current_window = true }),
+			action = pub.fuzzy_loader.restore_action(),
 		})
 
 		-- Alt+D: fuzzy delete saved state

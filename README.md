@@ -38,7 +38,7 @@ resurrect.setup(config, {
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
-  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R / Alt+D bindings
+  keybindings       = true, -- add Alt+W/S/Shift+W/Shift+T/R/D bindings
   status_bar        = true, -- show last save time and tab titles in the right status bar
 })
 ```
