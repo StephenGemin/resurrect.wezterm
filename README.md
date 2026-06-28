@@ -29,28 +29,31 @@ return config
 
 ### Setup Options
 
-All options are optional. Defaults are shown below:
+`setup()` handles autosave, startup restore, status bar, and keybindings — no hand-rolled
+callbacks needed. All options are optional:
 
 ```lua
 resurrect.setup(config, {
-  periodic_interval = 300,  -- seconds between periodic saves
-  restore_delay     = 0,    -- seconds to wait before sending process-restore commands
+  periodic_interval = 300,   -- seconds between periodic saves
+  restore_delay     = 0,     -- seconds to wait before sending process-restore commands
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
-  keybindings       = true, -- add Alt+W / Alt+Shift+W / Alt+Shift+T / Alt+R / Alt+D bindings
-  status_bar        = true, -- show last save time and tab titles in the right status bar
+  keybindings       = true,  -- Alt+W/S/Shift+W/Shift+T/R/D bindings; set false to use your own
+  status_bar        = true,  -- show last save time and tab titles in the right status bar
 })
 ```
 
-Set any option to `false` to disable that feature. For example, to skip the built-in
-keybindings and define your own:
+To use your own keybindings, set `keybindings = false` and add them to your config:
 
 ```lua
 resurrect.setup(config, { keybindings = false })
 
--- Add your own custom bindings here
-config.keys = { ... }
+config.keys = {
+  { key = "s", mods = "ALT", action = resurrect.workspace_state.save_workspace_action() },
+  { key = "r", mods = "ALT", action = resurrect.fuzzy_loader.restore_action() },
+  { key = "d", mods = "ALT", action = resurrect.fuzzy_loader.delete_action() },
+}
 ```
 
 ## Advanced Setup
@@ -112,6 +115,14 @@ action = resurrect.fuzzy_loader.restore_action({
   on_pane_restore = resurrect.tab_state.default_on_pane_restore,
   -- fuzzy_load_opts = { show_state_with_date = true },
 })
+```
+
+When restoring a **workspace**, `restore_action` restores in place into the window the
+picker was invoked from by default. Set `current_window = false` to spawn a new window
+into the saved workspace instead:
+
+```lua
+action = resurrect.fuzzy_loader.restore_action({ current_window = false })
 ```
 
 #### Manual dispatch
