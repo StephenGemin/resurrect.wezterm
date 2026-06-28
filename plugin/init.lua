@@ -155,7 +155,7 @@ function pub.setup(config, opts)
 		table.insert(config.keys, {
 			key = "r",
 			mods = "ALT",
-			action = pub.fuzzy_loader.restore_action(),
+			action = pub.fuzzy_loader.restore_action({ current_window = true }),
 		})
 
 		-- Alt+D: fuzzy delete saved state
