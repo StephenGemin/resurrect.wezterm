@@ -296,10 +296,23 @@ function pub.restore_action(opts)
 				)
 			end,
 			window = function(name)
+				local ws = state_manager.load_state(name, "window")
+				local spawn_args = {}
+				if ws.size then
+					spawn_args.width = ws.size.cols
+					spawn_args.height = ws.size.rows
+				end
+				if ws.tabs and ws.tabs[1] and ws.tabs[1].pane_tree then
+					spawn_args.cwd = ws.tabs[1].pane_tree.cwd
+				end
+				local first_tab, first_pane, new_win = wezterm.mux.spawn_window(spawn_args)
 				require("resurrect.window_state").restore_window(
-					pane:window(),
-					state_manager.load_state(name, "window"),
-					restore_opts
+					new_win,
+					ws,
+					utils.tbl_deep_extend("force", restore_opts, {
+						tab = first_tab,
+						pane = first_pane,
+					})
 				)
 			end,
 			tab = function(name)
