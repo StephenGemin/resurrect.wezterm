@@ -341,7 +341,19 @@ function pub.delete_action(opts)
 	}, opts or {})
 	return wezterm.action_callback(function(win, pane)
 		pub.fuzzy_load(win, pane, function(id)
+			local state_type = id:match("^([^/\\]+)")
+			local raw = id:match("[/\\](.+)$")
+			local name = raw and raw:gsub("%.json$", "")
 			require("resurrect.state_manager").delete_state(id)
+			if name then
+				if state_type == "tab" then
+					require("resurrect.tab_state").on_state_deleted(name)
+				elseif state_type == "window" then
+					require("resurrect.window_state").on_state_deleted(name)
+				elseif state_type == "workspace" then
+					require("resurrect.workspace_state").on_state_deleted(name)
+				end
+			end
 		end, delete_opts)
 	end)
 end

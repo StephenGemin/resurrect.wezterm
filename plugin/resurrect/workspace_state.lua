@@ -4,6 +4,8 @@ local state_manager_mod = require("resurrect.state_manager")
 
 local pub = {}
 
+local _named_workspaces = {} -- {[workspace_name: string] = true}
+
 ---restore workspace state
 ---@param workspace_state workspace_state
 ---@param opts? restore_opts
@@ -78,8 +80,43 @@ end
 ---Mirrors save_window_action() and save_tab_action() for use in custom key tables.
 ---@return table wezterm action
 function pub.save_workspace_action()
-	return wezterm.action_callback(function(_win, _pane)
-		state_manager_mod.save_state(pub.get_workspace_state())
+	return wezterm.action_callback(function(win, pane)
+		local current = wezterm.mux.get_active_workspace()
+
+		local function do_save()
+			local state = pub.get_workspace_state()
+			state.user_named = true
+			state_manager_mod.save_state(state)
+		end
+
+		if _named_workspaces[current] then
+			do_save()
+		elseif state_manager_mod.is_user_named(current, "workspace") then
+			_named_workspaces[current] = true
+			do_save()
+		else
+			win:perform_action(
+				wezterm.action.PromptInputLine({
+					description = "Enter a name for this workspace",
+					action = wezterm.action_callback(function(_, _, name)
+						if not name or name == "" then
+							return
+						end
+						if state_manager_mod.is_user_named(name, "workspace") then
+							wezterm.log_warn(
+								"resurrect: workspace name '" .. name .. "' already in use — overwriting"
+							)
+						end
+						if name ~= current then
+							wezterm.mux.rename_workspace(current, name)
+						end
+						_named_workspaces[name] = true
+						do_save()
+					end),
+				}),
+				pane
+			)
+		end
 	end)
 end
 
@@ -96,6 +133,13 @@ function pub.get_workspace_state()
 		end
 	end
 	return workspace_state
+end
+
+---Clears the named-workspace registry entry when a saved state is deleted via
+---delete_action(). The workspace name itself is not changed. Called by fuzzy_loader.
+---@param name string
+function pub.on_state_deleted(name)
+	_named_workspaces[name] = nil
 end
 
 return pub

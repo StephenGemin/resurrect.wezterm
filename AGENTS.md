@@ -88,6 +88,16 @@ API names a user's `wezterm.lua` calls, and the documented default behaviours â€
 refactor that silently breaks a user's config fails CI instead. It is deliberately
 small and behaviour-focused, not a coverage exercise.
 
+**Test philosophy â€” behaviour over mechanism.** A test should assert what a user
+observes, not how the code achieves it. Avoid tests that:
+- Inspect internal action objects, stub module-level functions, or assert on which
+  private helper was called.
+- Would need to be rewritten whenever an implementation detail changes but the
+  observable outcome stays the same.
+
+If writing a test requires stubbing an internal function to make it compile, that is
+a sign the test is asserting a mechanism. Prefer not to write it.
+
 The plugin modules `require("wezterm")` and reach into `wezterm.mux` / `gui` at load
 time, so they cannot be required directly under plain Lua. `spec/spec_helper.lua`
 installs a controllable `wezterm` mock and (re)loads a module against it; specs assert

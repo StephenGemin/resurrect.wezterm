@@ -3,6 +3,8 @@ local tab_state_mod = require("resurrect.tab_state")
 local state_manager_mod = require("resurrect.state_manager")
 local pub = {}
 
+local _named_windows = {} -- {[window_id: integer] = name: string}
+
 ---Returns the state of the window
 ---@param window MuxWindow
 ---@return window_state
@@ -89,26 +91,58 @@ end
 function pub.save_window_action()
 	return wezterm.action_callback(function(win, pane)
 		local mux_win = win:mux_window()
-		local win_title = mux_win:get_title()
-		if not win_title or win_title == "" then
+		local win_id = mux_win:window_id()
+
+		local function do_save(mw)
+			local state = pub.get_window_state(mw)
+			state.user_named = true
+			state_manager_mod.save_state(state)
+		end
+
+		if _named_windows[win_id] then
+			do_save(mux_win)
+		elseif state_manager_mod.is_user_named(mux_win:get_title(), "window") then
+			_named_windows[win_id] = mux_win:get_title()
+			do_save(mux_win)
+		else
 			win:perform_action(
 				wezterm.action.PromptInputLine({
-					description = "Enter new window title",
-					action = wezterm.action_callback(function(window, _, title)
-						if title then
-							window:mux_window():set_title(title)
-							local state = pub.get_window_state(mux_win)
-							state_manager_mod.save_state(state)
+					description = "Enter a name for this window",
+					action = wezterm.action_callback(function(window, _, name)
+						if not name or name == "" then
+							return
 						end
+						local mw = window:mux_window()
+						if state_manager_mod.is_user_named(name, "window") then
+							wezterm.log_warn("resurrect: window name '" .. name .. "' already in use — overwriting")
+						end
+						_named_windows[mw:window_id()] = name
+						mw:set_title(name)
+						do_save(mw)
 					end),
 				}),
 				pane
 			)
-		else
-			local state = pub.get_window_state(mux_win)
-			state_manager_mod.save_state(state)
 		end
 	end)
+end
+
+---Clears the named-window registry entry and resets the window title when a
+---saved state is deleted via delete_action(). Called by fuzzy_loader.
+---@param name string
+function pub.on_state_deleted(name)
+	for id, stored in pairs(_named_windows) do
+		if stored == name then
+			_named_windows[id] = nil
+			break
+		end
+	end
+	for _, mux_win in ipairs(wezterm.mux.all_windows()) do
+		if mux_win:get_title() == name then
+			mux_win:set_title("")
+			return
+		end
+	end
 end
 
 return pub

@@ -3,6 +3,8 @@ local pane_tree_mod = require("resurrect.pane_tree")
 local state_manager_mod = require("resurrect.state_manager")
 local pub = {}
 
+local _named_tabs = {} -- {[tab_id: integer] = name: string}
+
 -- Seconds to wait before sending a process-restore command to a pane.
 -- Shells need a moment to initialise before they can accept input.
 -- Set via resurrect.setup(config, { restore_delay = N }) or directly.
@@ -132,23 +134,38 @@ end
 function pub.save_tab_action()
 	return wezterm.action_callback(function(win, pane)
 		local tab = pane:tab()
-		if tab:get_title() == "" then
+		local tab_id = tab:tab_id()
+
+		local function do_save(t)
+			local state = pub.get_tab_state(t)
+			state.user_named = true
+			state_manager_mod.save_state(state)
+		end
+
+		if _named_tabs[tab_id] then
+			do_save(tab)
+		elseif state_manager_mod.is_user_named(tab:get_title(), "tab") then
+			_named_tabs[tab_id] = tab:get_title()
+			do_save(tab)
+		else
 			win:perform_action(
 				wezterm.action.PromptInputLine({
-					description = "Enter new tab title",
-					action = wezterm.action_callback(function(_, callback_pane, title)
-						if title then
-							callback_pane:tab():set_title(title)
-							local state = pub.get_tab_state(tab)
-							state_manager_mod.save_state(state)
+					description = "Enter a name for this tab",
+					action = wezterm.action_callback(function(_, callback_pane, name)
+						if not name or name == "" then
+							return
 						end
+						local t = callback_pane:tab()
+						if state_manager_mod.is_user_named(name, "tab") then
+							wezterm.log_warn("resurrect: tab name '" .. name .. "' already in use — overwriting")
+						end
+						_named_tabs[t:tab_id()] = name
+						t:set_title(name)
+						do_save(t)
 					end),
 				}),
 				pane
 			)
-		elseif tab:get_title() then
-			local state = pub.get_tab_state(tab)
-			state_manager_mod.save_state(state)
 		end
 	end)
 end
@@ -204,6 +221,26 @@ function pub.default_on_pane_restore(pane_tree)
 		pane:inject_output(pane_tree.text:gsub("%s+$", ""))
 		-- Send newline to trigger a fresh shell prompt at the correct position
 		pane:send_text("\r\n")
+	end
+end
+
+---Clears the named-tab registry entry and resets the tab title when a saved
+---state is deleted via delete_action(). Called by fuzzy_loader.
+---@param name string
+function pub.on_state_deleted(name)
+	for id, stored in pairs(_named_tabs) do
+		if stored == name then
+			_named_tabs[id] = nil
+			break
+		end
+	end
+	for _, mux_win in ipairs(wezterm.mux.all_windows()) do
+		for _, tab in ipairs(mux_win:tabs()) do
+			if tab:get_title() == name then
+				tab:set_title("")
+				return
+			end
+		end
 	end
 end
 
