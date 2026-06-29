@@ -316,7 +316,16 @@ function pub.restore_action(opts)
 				)
 			end,
 			tab = function(name)
-				tab_state.restore_tab(pane:tab(), state_manager.load_state(name, "tab"), restore_opts)
+				local ts = state_manager.load_state(name, "tab")
+				local spawn_args = {}
+				if ts.pane_tree and ts.pane_tree.cwd then
+					spawn_args.cwd = ts.pane_tree.cwd
+				end
+				if ts.pane_tree and ts.pane_tree.domain then
+					spawn_args.domain = { DomainName = ts.pane_tree.domain }
+				end
+				local new_tab, new_pane = pane:window():spawn_tab(spawn_args)
+				tab_state.restore_tab(new_tab, ts, utils.tbl_deep_extend("force", restore_opts, { pane = new_pane }))
 			end,
 		}
 
