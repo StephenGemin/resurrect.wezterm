@@ -123,7 +123,13 @@ function pub.setup(config, opts)
 		table.insert(config.keys, {
 			key = "w",
 			mods = "ALT",
-			action = pub.workspace_state.save_workspace_action(),
+			action = wezterm.action_callback(function(win, _pane)
+				local workspace = pub.workspace_state.get_workspace_state()
+				require("resurrect.state_manager").save_state(workspace)
+				local name = workspace.workspace or "?"
+				wezterm.log_info("resurrect: saved workspace '" .. name .. "'")
+				win:toast_notification("resurrect", "Workspace saved: " .. name, nil, 2000)
+			end),
 		})
 
 		-- Alt+S: save workspace + current window
@@ -132,8 +138,13 @@ function pub.setup(config, opts)
 			mods = "ALT",
 			action = wezterm.action_callback(function(win, _pane)
 				local state_manager = require("resurrect.state_manager")
-				state_manager.save_state(pub.workspace_state.get_workspace_state())
-				state_manager.save_state(pub.window_state.get_window_state(win:mux_window()))
+				local workspace = pub.workspace_state.get_workspace_state()
+				local window = pub.window_state.get_window_state(win:mux_window())
+				state_manager.save_state(workspace)
+				state_manager.save_state(window)
+				local name = workspace.workspace or "?"
+				wezterm.log_info("resurrect: saved workspace '" .. name .. "' + window")
+				win:toast_notification("resurrect", "Saved workspace + window: " .. name, nil, 2000)
 			end),
 		})
 

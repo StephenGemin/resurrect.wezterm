@@ -89,7 +89,8 @@ end
 function pub.save_window_action()
 	return wezterm.action_callback(function(win, pane)
 		local mux_win = win:mux_window()
-		if mux_win:get_title() == "" then
+		local win_title = mux_win:get_title()
+		if not win_title or win_title == "" then
 			win:perform_action(
 				wezterm.action.PromptInputLine({
 					description = "Enter new window title",
@@ -103,7 +104,7 @@ function pub.save_window_action()
 				}),
 				pane
 			)
-		elseif mux_win:get_title() then
+		else
 			local state = pub.get_window_state(mux_win)
 			state_manager_mod.save_state(state)
 		end
