@@ -3,7 +3,7 @@ local tab_state_mod = require("resurrect.tab_state")
 local state_manager_mod = require("resurrect.state_manager")
 local pub = {}
 
-local _named_windows = {} -- {[window_id: integer] = true}
+local _named_windows = {} -- {[window_id: integer] = name: string}
 
 ---Returns the state of the window
 ---@param window MuxWindow
@@ -102,7 +102,7 @@ function pub.save_window_action()
 		if _named_windows[win_id] then
 			do_save(mux_win)
 		elseif state_manager_mod.is_user_named(mux_win:get_title(), "window") then
-			_named_windows[win_id] = true
+			_named_windows[win_id] = mux_win:get_title()
 			do_save(mux_win)
 		else
 			win:perform_action(
@@ -116,7 +116,7 @@ function pub.save_window_action()
 						if state_manager_mod.is_user_named(name, "window") then
 							wezterm.log_warn("resurrect: window name '" .. name .. "' already in use — overwriting")
 						end
-						_named_windows[mw:window_id()] = true
+						_named_windows[mw:window_id()] = name
 						mw:set_title(name)
 						do_save(mw)
 					end),
@@ -125,6 +125,24 @@ function pub.save_window_action()
 			)
 		end
 	end)
+end
+
+---Clears the named-window registry entry and resets the window title when a
+---saved state is deleted via delete_action(). Called by fuzzy_loader.
+---@param name string
+function pub.on_state_deleted(name)
+	for id, stored in pairs(_named_windows) do
+		if stored == name then
+			_named_windows[id] = nil
+			break
+		end
+	end
+	for _, mux_win in ipairs(wezterm.mux.all_windows()) do
+		if mux_win:get_title() == name then
+			mux_win:set_title("")
+			return
+		end
+	end
 end
 
 return pub

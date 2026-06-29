@@ -133,4 +133,11 @@ function pub.get_workspace_state()
 	return workspace_state
 end
 
+---Clears the named-workspace registry entry when a saved state is deleted via
+---delete_action(). The workspace name itself is not changed. Called by fuzzy_loader.
+---@param name string
+function pub.on_state_deleted(name)
+	_named_workspaces[name] = nil
+end
+
 return pub
