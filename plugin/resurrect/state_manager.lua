@@ -230,6 +230,17 @@ function pub.resurrect_on_gui_startup()
 	return suc, err
 end
 
+---Returns true if the saved state for name/type was explicitly user-named.
+---Does a quiet file read with no error events — safe to call when the file may not exist yet.
+---@param name string
+---@param type string
+---@return boolean
+function pub.is_user_named(name, type)
+	local path = get_file_path(name, type)
+	local json = file_io.load_json(path)
+	return json ~= nil and json.user_named == true
+end
+
 ---@param file_path string
 function pub.delete_state(file_path)
 	wezterm.emit("resurrect.state_manager.delete_state.start", file_path)
