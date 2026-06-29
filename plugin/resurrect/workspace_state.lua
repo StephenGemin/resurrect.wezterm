@@ -103,7 +103,9 @@ function pub.save_workspace_action()
 							return
 						end
 						if state_manager_mod.is_user_named(name, "workspace") then
-							wezterm.log_warn("resurrect: workspace name '" .. name .. "' already in use — overwriting")
+							wezterm.log_warn(
+								"resurrect: workspace name '" .. name .. "' already in use — overwriting"
+							)
 						end
 						if name ~= current then
 							wezterm.mux.rename_workspace(current, name)
