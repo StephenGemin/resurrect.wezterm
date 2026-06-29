@@ -92,7 +92,6 @@ small and behaviour-focused, not a coverage exercise.
 observes, not how the code achieves it. Avoid tests that:
 - Inspect internal action objects, stub module-level functions, or assert on which
   private helper was called.
-- Guard failure modes that a one-line manual smoke test would catch immediately.
 - Would need to be rewritten whenever an implementation detail changes but the
   observable outcome stays the same.
 
