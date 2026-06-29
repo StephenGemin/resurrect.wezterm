@@ -88,6 +88,10 @@ config.keys = {
 }
 ```
 
+On the first save of any workspace, window, or tab, you will be prompted to enter a name.
+Subsequent saves within the same WezTerm session (and after a restart, once the saved state
+confirms the name was previously assigned) save silently under the same name.
+
 ### Loading state
 
 Load workspace or window state via. fuzzy finder:
@@ -150,7 +154,11 @@ action = wezterm.action_callback(function(win, pane)
       resurrect.window_state.restore_window(pane:window(), state, opts)
     elseif type == "tab" then
       local state = resurrect.state_manager.load_state(id, "tab")
-      resurrect.tab_state.restore_tab(pane:tab(), state, opts)
+      local new_tab, new_pane = pane:window():spawn_tab({
+        cwd = state.pane_tree and state.pane_tree.cwd or nil,
+      })
+      opts.pane = new_pane
+      resurrect.tab_state.restore_tab(new_tab, state, opts)
     end
   end)
 end),
