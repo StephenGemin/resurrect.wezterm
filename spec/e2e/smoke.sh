@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# E2E smoke test: start WezTerm with the plugin and wait for the sentinel file.
+# E2E smoke test: start WezTerm with the given config and wait for the sentinel.
+# Usage: bash spec/e2e/smoke.sh <config-file>
 # Pass when the sentinel appears within 15 seconds; fail on timeout.
 #
 # Expects to be run from the repo root.
 # Caller sets DISPLAY=:99 on Linux before invoking this script.
 set -euo pipefail
 
+CONFIG="${1:?usage: smoke.sh <config-file>}"
 SENTINEL_UNIX="$(pwd)/.resurrect_e2e_sentinel"
 rm -f "$SENTINEL_UNIX"
 
@@ -20,7 +22,7 @@ else
 	export RESURRECT_SENTINEL="$SENTINEL_UNIX"
 fi
 
-wezterm --config-file spec/e2e/wezterm.lua start &
+wezterm --config-file "$CONFIG" start &
 WEZTERM_PID=$!
 
 cleanup() {

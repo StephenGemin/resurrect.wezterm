@@ -4,7 +4,7 @@
 -- the plugin loaded and started without error.
 --
 -- Run via: RESURRECT_REPO_PATH=<abs-path> RESURRECT_SENTINEL=<file> \
---          wezterm --config-file spec/e2e/smoke_wezterm.lua start
+--          wezterm --config-file spec/e2e/wezterm_basic.lua start
 
 local wezterm = require("wezterm")
 local sep = package.config:sub(1, 1)
