@@ -44,6 +44,12 @@ resurrect.setup(config, {
 })
 ```
 
+> [!NOTE]
+> `save_windows` and `save_tabs` only auto-save entities you have explicitly named.
+> Use `save_window_action()` (`Alt+Shift+W`) or `save_tab_action()` (`Alt+Shift+T`) to
+> name a window or tab — after that, it is included in every periodic save automatically.
+> Workspaces are always saved regardless of naming.
+
 To use your own keybindings, set `keybindings = false` and add them to your config:
 
 ```lua
