@@ -26,8 +26,18 @@ function pub.restore_workspace(workspace_state, opts)
 		opts.spawn_in_workspace = true
 	end
 
+	-- Tracks whether window 1 was restored into the caller's existing window
+	-- (opts.window) rather than spawned fresh into workspace_state.workspace.
+	-- A reused window's mux workspace is whatever it already was, so landing
+	-- the user in the restored workspace afterwards needs a rename, not a
+	-- switch -- see the should_switch handling below. Captured separately from
+	-- opts.window, which gets reassigned to each freshly spawned window as the
+	-- loop below continues past window 1.
+	local reused_window = nil
+
 	for i, window_state in ipairs(workspace_state.window_states) do
 		if i == 1 and opts.window then
+			reused_window = opts.window
 			-- inner size is in pixels
 			if opts.resize_window == true or opts.resize_window == nil then
 				opts.window:gui_window():set_inner_size(window_state.size.pixel_width, window_state.size.pixel_height)
@@ -68,7 +78,15 @@ function pub.restore_workspace(workspace_state, opts)
 		should_switch = opts.spawn_in_workspace
 	end
 	if workspace_state.workspace and workspace_state.workspace ~= "" then
-		if should_switch then
+		if should_switch and reused_window then
+			-- set_active_workspace only switches view to an *already-existing*
+			-- workspace by name. Window 1 was reused in place rather than spawned
+			-- into workspace_state.workspace, so nothing was ever created under
+			-- that name -- switching would find nothing and the window would keep
+			-- showing its old workspace name. Rename the window's current
+			-- workspace to the restored name instead.
+			wezterm.mux.rename_workspace(reused_window:get_workspace(), workspace_state.workspace)
+		elseif should_switch then
 			wezterm.mux.set_active_workspace(workspace_state.workspace)
 		else
 			-- Not switching (legacy `spawn_in_workspace = false`): keep the user in
