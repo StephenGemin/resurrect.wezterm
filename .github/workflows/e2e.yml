@@ -50,7 +50,9 @@ jobs:
             "https://github.com/wez/wezterm/releases/download/${WEZTERM_VERSION}/WezTerm-macos-${WEZTERM_VERSION}.zip" \
             -o wezterm-macos.zip
           unzip -q wezterm-macos.zip
-          echo "$(pwd)/WezTerm.app/Contents/MacOS" >> "$GITHUB_PATH"
+          # Locate the CLI binary dynamically rather than assuming the bundle layout.
+          WEZTERM_BIN=$(find . -type f -name "wezterm" | head -1)
+          echo "$(cd "$(dirname "$WEZTERM_BIN")" && pwd)" >> "$GITHUB_PATH"
 
       - name: Install WezTerm (Windows)
         if: runner.os == 'Windows'
