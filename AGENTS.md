@@ -112,7 +112,8 @@ Current unit specs:
 - `load_state_spec.lua` — returns the parsed table, or `{}` (never nil) on a bad file.
 - `restore_workspace_spec.lua` — the `spawn_in_workspace` / `switch_workspace` default
   matrix flagged as a breaking change in README.
-- `periodic_save_spec.lua` — the documented 15-minute default and that it saves.
+- `periodic_save_spec.lua` — the documented 15-minute default; workspace always saves;
+  windows/tabs only save when `user_named = true` is present in their state file.
 
 Run a single file with `busted spec/unit/save_state_spec.lua`.
 

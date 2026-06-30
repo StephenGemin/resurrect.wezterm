@@ -5,10 +5,9 @@
 local helper = require("spec_helper")
 
 describe("state_manager.periodic_save", function()
-	local state_manager, rec, saved
+	local state_manager, rec, saved, wz
 
 	before_each(function()
-		local wz
 		wz, rec = helper.new_wezterm()
 		state_manager = helper.load("resurrect.state_manager", wz)
 
@@ -17,6 +16,10 @@ describe("state_manager.periodic_save", function()
 		saved = {}
 		state_manager.save_state = function(state)
 			table.insert(saved, state)
+		end
+		-- Default: no entity is user-named (hermetic; avoids real filesystem reads).
+		state_manager.is_user_named = function()
+			return false
 		end
 		require("resurrect.workspace_state").get_workspace_state = function()
 			return { workspace = "snapshot", window_states = {} }
@@ -40,6 +43,17 @@ describe("state_manager.periodic_save", function()
 		assert.are.equal("snapshot", saved[1].workspace)
 	end)
 
+	it("re-stamps user_named on a previously user-named workspace", function()
+		state_manager.is_user_named = function()
+			return true
+		end
+		state_manager.periodic_save()
+		local call = helper.find_call(rec, "call_after")
+		call.fn()
+
+		assert.is_true(saved[1].user_named)
+	end)
+
 	it("honours a custom interval and skips workspaces when disabled", function()
 		state_manager.periodic_save({ interval_seconds = 5, save_workspaces = false })
 		local call = helper.find_call(rec, "call_after")
@@ -47,5 +61,38 @@ describe("state_manager.periodic_save", function()
 
 		call.fn()
 		assert.are.equal(0, #saved)
+	end)
+
+	it("skips windows that have not been user-named", function()
+		local mock_mux_win = { get_title = function() return "mywin" end }
+		wz.gui.gui_windows = function()
+			return { { mux_window = function() return mock_mux_win end } }
+		end
+
+		state_manager.periodic_save({ save_workspaces = false, save_windows = true })
+		local call = helper.find_call(rec, "call_after")
+		call.fn()
+
+		assert.are.equal(0, #saved)
+	end)
+
+	it("saves and re-stamps a user-named window", function()
+		local mock_mux_win = { get_title = function() return "mywin" end }
+		wz.gui.gui_windows = function()
+			return { { mux_window = function() return mock_mux_win end } }
+		end
+		require("resurrect.window_state").get_window_state = function()
+			return { title = "mywin", tabs = {} }
+		end
+		state_manager.is_user_named = function(name, type)
+			return name == "mywin" and type == "window"
+		end
+
+		state_manager.periodic_save({ save_workspaces = false, save_windows = true })
+		local call = helper.find_call(rec, "call_after")
+		call.fn()
+
+		assert.are.equal(1, #saved)
+		assert.is_true(saved[1].user_named)
 	end)
 end)

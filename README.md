@@ -44,6 +44,12 @@ resurrect.setup(config, {
 })
 ```
 
+> [!NOTE]
+> `save_windows` and `save_tabs` only auto-save entities you have explicitly named.
+> Use `save_window_action()` (`Alt+Shift+W`) or `save_tab_action()` (`Alt+Shift+T`) to
+> name a window or tab — after that, it is included in every periodic save automatically.
+> Workspaces are always saved regardless of naming.
+
 To use your own keybindings, set `keybindings = false` and add them to your config:
 
 ```lua
@@ -322,8 +328,12 @@ You can add the `opts` table to change the behaviour. It exposes the following o
 
 `interval_seconds` will save the state every time the supplied number of seconds has surpassed.
 `save_workspaces` will save workspaces if true otherwise not.
-`save_windows` will save windows if true otherwise not.
-`save_tabs` will save tabs if true otherwise not.
+`save_windows` will save windows if true, but only windows that have been explicitly named via
+`save_window_action()` at least once. Use `save_window_action()` (default: `Alt+Shift+W`) to
+opt a window into the auto-save cycle; unnamed windows are skipped to prevent unexpected file
+accumulation.
+`save_tabs` will save tabs if true, subject to the same opt-in requirement as windows — use
+`save_tab_action()` (default: `Alt+Shift+T`) to name a tab before it is included in auto-saves.
 
 ### Resurrecting on startup
 
