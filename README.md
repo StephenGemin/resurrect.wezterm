@@ -10,13 +10,12 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 - [Basic Setup](#basic-setup)
   - [Setup Options](#setup-options)
 - [Advanced Setup](#advanced-setup)
+  - [Resurrecting on startup](#resurrecting-on-startup)
   - [Saving state](#saving-state)
   - [Restoring state](#restoring-state)
   - [Deleting state](#deleting-state)
   - [Encryption (optional, recommended)](#encryption-optional-recommended)
-- [How do I use it?](#how-do-i-use-it)
 - [Configuration](#configuration)
-  - [Periodic saving of state](#periodic-saving-of-state)
   - [Configuration reference](#configuration-reference)
   - [Change the directory to store the saved state](#change-the-directory-to-store-the-saved-state)
   - [Events](#events)
@@ -67,30 +66,34 @@ resurrect.setup(config, {
 ```
 
 > [!NOTE]
-> `save_windows` and `save_tabs` only auto-save entities you have explicitly named.
-> Use `save_window_action()` (`Alt+Shift+W`) or `save_tab_action()` (`Alt+Shift+T`) to
-> name a window or tab — after that, it is included in every periodic save automatically.
-> Workspaces are always saved regardless of naming.
+> `save_windows` and `save_tabs` only auto-save entities you have explicitly named via
+> `save_window_action()` or `save_tab_action()`. Unnamed windows and tabs are skipped.
+> Workspaces always save; an unnamed workspace saves under its WezTerm name (default: `"default"`).
+> Saving to a name that already exists overwrites the file — this applies to all three types.
 
-To use your own keybindings, set `keybindings = false` and add them to your config:
-
-```lua
-resurrect.setup(config, { keybindings = false })
-
-config.keys = {
-  { key = "s", mods = "ALT", action = resurrect.workspace_state.save_workspace_action() },
-  { key = "r", mods = "ALT", action = resurrect.fuzzy_loader.restore_action() },
-  { key = "d", mods = "ALT", action = resurrect.fuzzy_loader.delete_action() },
-}
-```
+To define your own keybindings, set `keybindings = false` and see [Saving state](#saving-state),
+[Restoring state](#restoring-state), and [Deleting state](#deleting-state) in Advanced Setup.
 
 ## Advanced Setup
 
 If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
 
+### Resurrecting on startup
+
+Resume from your last session automatically by adding this to your config:
+
+```lua
+wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
+```
+
+This reads the current state file written by `periodic_save` and `event_driven_save`
+whenever `save_workspaces = true`. `setup()` wires this up automatically — only add
+it manually if you are not using `setup()`.
+
 ### Saving state
 
-Save workspace, window and/or tab state based on name and title:
+Bind save actions to keys. Each action function takes no arguments — the naming prompt
+and silent re-save behaviour are handled automatically (see the note below):
 
 ```lua
 local wezterm = require("wezterm")
@@ -116,13 +119,9 @@ config.keys = {
 }
 ```
 
-On the first save of any workspace, window, or tab, you will be prompted to enter a name.
-Subsequent saves within the same WezTerm session (and after a restart, once the saved state
-confirms the name was previously assigned) save silently under the same name.
-
-> [!NOTE]
-> Named windows and tabs are automatically included in periodic and event-driven saves.
-> See [Setup Options](#setup-options) for details.
+On the first save of a window or tab you are prompted for a name; subsequent saves are
+silent. Saving to a name already in use overwrites the existing file. Once named, a
+window or tab is picked up automatically by periodic and event-driven saves.
 
 ### Restoring state
 
@@ -141,24 +140,19 @@ config.keys = {
 }
 ```
 
-`restore_action` accepts `restore_opts` and an optional `fuzzy_load_opts` sub-table to
-customise the picker:
+`restore_action` accepts `restore_opts` to control restore behaviour and an optional
+`fuzzy_load_opts` sub-table to customise the picker. For workspace restores,
+`current_window = true` (the default) restores in place; set it to `false` to spawn
+a new window:
 
 ```lua
 action = resurrect.fuzzy_loader.restore_action({
-  relative = true,
-  restore_text = true,
+  relative        = true,
+  restore_text    = true,
   on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  current_window  = true,  -- set false to spawn a new window instead of restoring in place
   -- fuzzy_load_opts = { show_state_with_date = true },
 })
-```
-
-When restoring a **workspace**, `restore_action` restores in place into the window the
-picker was invoked from by default. Set `current_window = false` to spawn a new window
-into the saved workspace instead:
-
-```lua
-action = resurrect.fuzzy_loader.restore_action({ current_window = false })
 ```
 
 #### restore_opts
@@ -395,44 +389,11 @@ resurrect.state_manager.set_encryption({
 
 If you wish to share a non-documented way of encrypting your files or think something is missing, then please make a PR or file an issue.
 
-## How do I use it?
-
-I use the builtin `resurrect.state_manager.periodic_save()` to save my workspaces every 15 minutes.
-This ensures that if I close Wezterm, then I can restore my session state to a state which is at most 15 minutes old.
-
-I also use it to restore the state of my workspaces. As I use the plugin [smart_workspace_switcher.wezterm](https://github.com/StephenGemin/smart_workspace_switcher.wezterm),
-to change workspaces whenever I change "project" (git repository).
-I have added the following to my configuration to be able to do this whenever I change workspaces:
-
-```lua
--- loads the state whenever I create a new workspace
-wezterm.on("smart_workspace_switcher.workspace_switcher.created", function(window, path, label)
-  local workspace_state = resurrect.workspace_state
-
-  workspace_state.restore_workspace(resurrect.state_manager.load_state(label, "workspace"), {
-    window = window,
-    relative = true,
-    restore_text = true,
-    on_pane_restore = resurrect.tab_state.default_on_pane_restore,
-  })
-end)
-
--- Saves the state whenever I select a workspace
-wezterm.on("smart_workspace_switcher.workspace_switcher.selected", function(window, path, label)
-  local workspace_state = resurrect.workspace_state
-  resurrect.state_manager.save_state(workspace_state.get_workspace_state())
-end)
-```
-
-You can checkout my configuration [here](https://github.com/StephenGemin/.dotfiles/tree/main/home-manager/config/wezterm).
-
 ## Configuration
 
-### Periodic saving of state
+### Configuration reference
 
-`setup()` handles periodic saves automatically — most users do not need to call
-`periodic_save()` directly. If you need manual control (e.g. to start saving later,
-or to use different intervals for different entity types), call it yourself:
+**Periodic saving** — `setup()` handles this automatically. For manual control:
 
 ```lua
 resurrect.state_manager.periodic_save({
@@ -442,21 +403,6 @@ resurrect.state_manager.periodic_save({
   save_tabs        = true,
 })
 ```
-
-See [Setup Options](#setup-options) for the `save_windows` / `save_tabs` opt-in behaviour.
-
-### Configuration reference
-
-**Resurrecting on startup**
-
-Resume from your last session automatically:
-
-```lua
-wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
-```
-
-This reads the current state file written by `periodic_save` and `event_driven_save`
-whenever `save_workspaces = true`. `setup()` wires this up automatically.
 
 **Limiting pane output lines**
 
