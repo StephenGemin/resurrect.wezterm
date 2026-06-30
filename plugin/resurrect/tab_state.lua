@@ -85,6 +85,31 @@ function pub.get_tab_state(tab)
 	return tab_state
 end
 
+-- Trailing blank rows in captured scrollback often end in a color/SGR escape
+-- sequence (e.g. a trailing reset) even though the row itself renders empty,
+-- so a plain trailing-whitespace strip leaves them in place. Strip whitespace
+-- and escape sequences alternately from the end until neither matches, so
+-- idle rows on screen at save time don't get replayed -- and re-saved -- on
+-- every subsequent restore.
+local ESC = string.char(27)
+local function strip_trailing_blank_rows(text)
+	local stripped = true
+	while stripped do
+		stripped = false
+		local without_ws, ws_count = text:gsub("%s+$", "")
+		if ws_count > 0 then
+			text = without_ws
+			stripped = true
+		end
+		local without_esc, esc_count = text:gsub(ESC .. "%[[^%a]*%a$", "")
+		if esc_count > 0 then
+			text = without_esc
+			stripped = true
+		end
+	end
+	return text
+end
+
 ---Force closes all other tabs in the window but one
 ---@param tab MuxTab
 ---@param pane_to_keep Pane
@@ -223,7 +248,7 @@ function pub.default_on_pane_restore(pane_tree)
 			)
 		end
 	elseif pane_tree.text then
-		pane:inject_output(pane_tree.text:gsub("%s+$", ""))
+		pane:inject_output(strip_trailing_blank_rows(pane_tree.text))
 		-- Send newline to trigger a fresh shell prompt at the correct position
 		pane:send_text("\r\n")
 	end
