@@ -20,6 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        config: [spec/e2e/wezterm_basic.lua, spec/e2e/wezterm_save.lua]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
@@ -69,4 +70,4 @@ jobs:
         shell: bash
         run: |
           [ "$RUNNER_OS" = "Linux" ] && export DISPLAY=:99
-          bash spec/e2e/smoke.sh spec/e2e/wezterm_basic.lua
+          bash spec/e2e/smoke.sh "${{ matrix.config }}"
