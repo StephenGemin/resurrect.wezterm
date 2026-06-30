@@ -259,10 +259,11 @@ end
 ---Accepts the same restore_opts as restore_workspace/restore_window/restore_tab plus
 ---an optional `fuzzy_load_opts` field to customise the picker itself.
 ---
----By default, workspace restores happen in place into the window the picker was invoked
----from. Set `current_window = false` to spawn a new window instead.
----`current_window` is ignored for window and tab restores.
----@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table; set `current_window = false` to spawn a new window for workspace restores
+---Workspace and window restores always spawn a new GUI window and never touch the
+---window the picker was invoked from, matching tmux-resurrect behaviour where restoring
+---a session never modifies the current context. Tab restores always add to the current
+---window, since a tab can't exist outside of one.
+---@param opts? table restore_opts merged with optional `fuzzy_load_opts` sub-table
 ---@return table wezterm action
 function pub.restore_action(opts)
 	opts = opts or {}
@@ -276,14 +277,11 @@ function pub.restore_action(opts)
 			on_pane_restore = tab_state.default_on_pane_restore,
 		}, opts)
 		restore_opts.fuzzy_load_opts = nil
-
-		-- Resolve current_window to the MuxWindow here, at invocation time, since
-		-- MuxWindow objects only exist inside a callback — not at config time where
-		-- restore_action() is called.
-		-- false opts out to spawn-a-new-window; any other value (including nil) restores in place.
-		if restore_opts.current_window ~= false then
-			restore_opts.window = pane:window()
-		end
+		-- Force nil regardless of what opts contained: a workspace/window restore must
+		-- never reuse the window the picker was invoked from. With opts.window nil,
+		-- restore_workspace spawns a fresh window for window 1 too, the same as every
+		-- other window in the saved state.
+		restore_opts.window = nil
 		restore_opts.current_window = nil
 
 		-- One restorer per state type, so the picker callback is a flat lookup

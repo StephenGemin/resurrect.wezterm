@@ -192,16 +192,16 @@ config.keys = {
 ```
 
 `restore_action` accepts `restore_opts` to control restore behaviour and an optional
-`fuzzy_load_opts` sub-table to customise the picker. For workspace restores,
-`current_window = true` (the default) restores in place; set it to `false` to spawn
-a new window:
+`fuzzy_load_opts` sub-table to customise the picker. Workspace and window restores always
+spawn a new GUI window and never modify the window the picker was invoked from, matching
+tmux-resurrect behaviour where restoring a session never touches your current context.
+Tab restores always add to the current window, since a tab can't exist outside of one.
 
 ```lua
 action = resurrect.fuzzy_loader.restore_action({
   relative        = true,
   restore_text    = true,
   on_pane_restore = resurrect.tab_state.default_on_pane_restore,
-  current_window  = true,  -- set false to spawn a new window instead of restoring in place
   -- fuzzy_load_opts = { show_state_with_date = true },
 })
 ```
