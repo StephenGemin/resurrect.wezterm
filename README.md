@@ -4,6 +4,28 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 
 ![Screencastfrom2024-07-2918-50-57-ezgif com-resize](https://github.com/user-attachments/assets/640aefea-793c-486d-9579-1a9c8bb4c1fa)
 
+## Table of Contents
+
+- [Features](#features)
+- [Basic Setup](#basic-setup)
+  - [Setup Options](#setup-options)
+- [Advanced Setup](#advanced-setup)
+  - [Saving state](#saving-state)
+  - [Restoring state](#restoring-state)
+  - [Deleting state](#deleting-state)
+  - [Encryption (optional, recommended)](#encryption-optional-recommended)
+- [How do I use it?](#how-do-i-use-it)
+- [Configuration](#configuration)
+  - [Periodic saving of state](#periodic-saving-of-state)
+  - [Configuration reference](#configuration-reference)
+  - [Change the directory to store the saved state](#change-the-directory-to-store-the-saved-state)
+  - [Events](#events)
+- [State files](#state-files)
+- [Augmenting the command palette](#augmenting-the-command-palette)
+- [FAQ](#faq)
+- [Contributions](#contributions)
+- [Disclaimer](#disclaimer)
+
 ## Features
 
 - Restore your windows, tabs and panes with the layout and text from a saved state.
@@ -98,9 +120,13 @@ On the first save of any workspace, window, or tab, you will be prompted to ente
 Subsequent saves within the same WezTerm session (and after a restart, once the saved state
 confirms the name was previously assigned) save silently under the same name.
 
-### Loading state
+> [!NOTE]
+> Named windows and tabs are automatically included in periodic and event-driven saves.
+> See [Setup Options](#setup-options) for details.
 
-Load workspace or window state via. fuzzy finder:
+### Restoring state
+
+Restore workspace, window or tab state via fuzzy finder:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -115,8 +141,8 @@ config.keys = {
 }
 ```
 
-`restore_action` accepts the same `restore_opts` as `restore_workspace` / `restore_window` / `restore_tab`,
-plus an optional `fuzzy_load_opts` sub-table to customise the picker:
+`restore_action` accepts `restore_opts` and an optional `fuzzy_load_opts` sub-table to
+customise the picker:
 
 ```lua
 action = resurrect.fuzzy_loader.restore_action({
@@ -134,6 +160,64 @@ into the saved workspace instead:
 ```lua
 action = resurrect.fuzzy_loader.restore_action({ current_window = false })
 ```
+
+#### restore_opts
+
+Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `restore_action`:
+
+```lua
+{
+  spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace; default: true. Set false to spawn into the "default" workspace
+  switch_workspace: boolean?,   -- Switch the active workspace to the restored one; defaults to the value of spawn_in_workspace
+  relative: boolean?,           -- Use relative size when restoring panes
+  absolute: boolean?,           -- Use absolute size when restoring panes
+  close_open_tabs: boolean?,    -- Closes all tabs which are open in the window, only restored tabs are left
+  close_open_panes: boolean?,   -- Closes all panes which are open in the tab, only keeping the panes to be restored
+  pane: Pane?,                  -- Restore in this pane
+  tab: MuxTab?,                 -- Restore in this tab
+  window: MuxWindow,            -- Restore in this window
+  resize_window: boolean?,      -- Resizes the window, default: true
+  on_pane_restore: fun(pane_tree: pane_tree), -- Function to restore panes; use resurrect.tab_state.default_on_pane_restore
+}
+```
+
+> [!NOTE]
+> `spawn_in_workspace` defaults to `true`: the restored windows are spawned into the
+> saved workspace and the active workspace is switched to it. Set
+> `spawn_in_workspace = false` to keep the legacy behaviour, where the windows are
+> spawned into Wezterm's `"default"` workspace and the active workspace is **not**
+> changed — so you stay where you are and the restored windows appear under
+> `"default"`. By default `switch_workspace` follows `spawn_in_workspace`; set it
+> explicitly to switch (or not) independently of where the windows are spawned.
+
+> [!WARNING]
+> The `spawn_in_workspace = true` default is a breaking change from earlier versions,
+> which defaulted to `false`. If you relied on restored windows landing in the
+> `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
+
+#### Restoring into the current window
+
+To restore a window state into the current window use `restore_window` with `close_open_tabs`:
+
+```lua
+local opts = {
+  close_open_tabs = true,
+  window = pane:window(),
+  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  relative = true,
+  restore_text = true,
+}
+resurrect.window_state.restore_window(pane:window(), state, opts)
+```
+
+This will restore the state into the passed window and additionally close all
+the tabs in the window, such that only the restored tabs are visible after restoring.
+
+#### Windows not resizing correctly
+
+Some users has had problems with `window_decorations` and `window_padding`
+configuration options, which caused issues when resizing, see [comment](https://github.com/StephenGemin/resurrect.wezterm/issues/72#issuecomment-2582912347).
+To avoid this, set `resize_window = false` in your `restore_opts`.
 
 #### Manual dispatch
 
@@ -170,9 +254,36 @@ action = wezterm.action_callback(function(win, pane)
 end),
 ```
 
+#### fuzzy_load opts
+
+`resurrect.fuzzy_loader.fuzzy_load(window, pane, callback, opts?)` accepts an optional
+`opts` argument to control picker appearance and filtering:
+
+```lua
+---@alias fmt_fun fun(label: string): string
+---@alias fuzzy_load_opts {
+  title: string,               -- dialog title, default: "Load state"
+  description: string,         -- description shown above the picker
+  fuzzy_description: string,   -- description in fuzzy search mode
+  is_fuzzy: boolean,           -- enter directly in fuzzy mode, default: true
+  ignore_workspaces: boolean,  -- hide workspace entries, default: false
+  ignore_tabs: boolean,        -- hide tab entries, default: false
+  ignore_windows: boolean,     -- hide window entries, default: false
+  fmt_window: fmt_fun,         -- format function for window state name (wezterm.format)
+  fmt_workspace: fmt_fun,      -- format function for workspace state name
+  fmt_tab: fmt_fun,            -- format function for tab state name
+  fmt_date: fmt_fun,           -- format function for date
+  show_state_with_date: boolean, -- show last update of the state file, default: false
+  date_format: string,         -- date formatting, default: "%d-%m-%Y %H:%M:%S"
+  ignore_screen_width: boolean,-- whether to shrink the list if the window is too narrow, default: true
+  name_truncature: string,     -- string used when state name is truncated
+  min_filename_size: number    -- minimum size of state name before truncation
+}
+```
+
 ### Deleting state
 
-You can use the fuzzy finder to delete a saved state file by adding a keybind to your config:
+Delete a saved state file via fuzzy finder:
 
 ```lua
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
@@ -319,134 +430,51 @@ You can checkout my configuration [here](https://github.com/StephenGemin/.dotfil
 
 ### Periodic saving of state
 
-`resurrect.state_manager.periodic_save(opts?)` will save the workspace state every 15 minutes by default.
-You can add the `opts` table to change the behaviour. It exposes the following options:
+`setup()` handles periodic saves automatically — most users do not need to call
+`periodic_save()` directly. If you need manual control (e.g. to start saving later,
+or to use different intervals for different entity types), call it yourself:
 
 ```lua
----@param opts? { interval_seconds: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean? }
+resurrect.state_manager.periodic_save({
+  interval_seconds = 900, -- default: 300 when called via setup()
+  save_workspaces  = true,
+  save_windows     = true,
+  save_tabs        = true,
+})
 ```
 
-`interval_seconds` will save the state every time the supplied number of seconds has surpassed.
-`save_workspaces` will save workspaces if true otherwise not.
-`save_windows` will save windows if true, but only windows that have been explicitly named via
-`save_window_action()` at least once. Use `save_window_action()` (default: `Alt+Shift+W`) to
-opt a window into the auto-save cycle; unnamed windows are skipped to prevent unexpected file
-accumulation.
-`save_tabs` will save tabs if true, subject to the same opt-in requirement as windows — use
-`save_tab_action()` (default: `Alt+Shift+T`) to name a tab before it is included in auto-saves.
+See [Setup Options](#setup-options) for the `save_windows` / `save_tabs` opt-in behaviour.
 
-### Resurrecting on startup
+### Configuration reference
 
-You can resume from where you left off by resurrecting on startup with
-the following addition to your config:
+**Resurrecting on startup**
+
+Resume from your last session automatically:
 
 ```lua
 wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
 ```
 
-This will read a file which has been written by the
-`resurrect.state_manager.write_current_state("workspace name", "workspace")` function.
+This reads the current state file written by `periodic_save` and `event_driven_save`
+whenever `save_workspaces = true`. `setup()` wires this up automatically.
 
-> [!NOTE]
-> For this to work, you must include a way to write the current workspace,
-> be it via. the `resurrect.state_manager.periodic_save` event or when changing workspaces.
-
-### Limiting the amount of output lines saved for a pane
-
-`resurrect.state_manager.set_max_nlines(number)` will limit each pane to save
-at most `number` lines to the state.
-This can improve performance when saving and loading state.
-
-### save_state options
-
-`resurrect.state_manager.save_state(state, opt_name?)` takes an optional string argument,
-which will rename the file to the name of the string.
-
-### restore_opts
-
-Options for restoring state:
+**Limiting pane output lines**
 
 ```lua
-{spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace; default: true. Set false to spawn into the "default" workspace
-switch_workspace: boolean?, -- Switch the active workspace to the restored one; defaults to the value of spawn_in_workspace
-relative: boolean?, -- Use relative size when restoring panes
-absolute: boolean?, -- Use absolute size when restoring panes
-close_open_tabs: boolean?, -- Closes all tabs which are open in the window, only restored tabs are left
-close_open_panes: boolean?, -- Closes all panes which are open in the tab, only keeping the panes to be restored
-pane: Pane?, -- Restore in this window
-tab: MuxTab?, -- Restore in this window
-window: MuxWindow, -- Restore in this window
-resize_window: boolean?, -- Resizes the window, default: true
-on_pane_restore: fun(pane_tree: pane_tree)} -- Function to restore panes, use resurrect.tab_state.default_on_pane_restore
+resurrect.state_manager.set_max_nlines(1000)
 ```
 
-> [!NOTE]
-> `spawn_in_workspace` defaults to `true`: the restored windows are spawned into the
-> saved workspace and the active workspace is switched to it. Set
-> `spawn_in_workspace = false` to keep the legacy behaviour, where the windows are
-> spawned into Wezterm's `"default"` workspace and the active workspace is **not**
-> changed — so you stay where you are and the restored windows appear under
-> `"default"`. By default `switch_workspace` follows `spawn_in_workspace`; set it
-> explicitly to switch (or not) independently of where the windows are spawned.
+Limits each pane to at most `n` lines of saved output. Reduces file size and improves
+save/load performance on busy terminals.
 
-> [!WARNING]
-> The `spawn_in_workspace = true` default is a breaking change from earlier versions,
-> which defaulted to `false`. If you relied on restored windows landing in the
-> `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
+**Custom save name**
 
-#### Windows not resizing correctly
-
-Some users has had problems with `window_decorations` and `window_padding`
-configuration options, which caused issues when resizing, see [comment](https://github.com/StephenGemin/resurrect.wezterm/issues/72#issuecomment-2582912347).
-To avoid this, set the `resize_window` to false.
-
-### Restoring into the current window
-
-To restore a window state into the current window use the `restore_window`
-function with `restore_opts` containing the window and `close_open_tabs` like so:
+`resurrect.state_manager.save_state(state, opt_name?)` accepts an optional string to
+override the auto-generated filename:
 
 ```lua
-local opts = {
-  close_open_tabs = true,
-  window = pane:window(),
-  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
-  relative = true,
-  restore_text = true,
-}
-resurrect.window_state.restore_window(pane:window(), state, opts)
+resurrect.state_manager.save_state(workspace_state.get_workspace_state(), "my-project")
 ```
-
-This will restore the state into the passed window and additionally close all
-the tabs in the window, such that only the restored tabs are visible after restoring.
-
-### fuzzy_load opts
-
-the `resurrect.fuzzy_loader.fuzzy_load(window, pane, callback, opts?)` function takes an
-optional `opts` argument, which has the following types:
-
-```lua
----@alias fmt_fun fun(label: string): string
----@alias fuzzy_load_opts {
-  title: string, -- dialog title, default: "Load state"
-  description: string, -- description, default: "Select State to Load and press Enter = accept, Esc = cancel, / = filter"
-  fuzzy_description: string, -- description in fyzzy search mode, default: "Search State to Load: "
-  is_fuzzy: boolean, -- enter directly in fuzzy mode, default: true
-  ignore_workspaces: boolean, -- does not show workspaces, default: false
-  ignore_tabs: boolean, -- does not show tabs, default: false
-  ignore_windows: boolean, -- does not show windows, default: false
-  fmt_window: fmt_fun, -- format function for window state name (wezterm.format)
-  fmt_workspace: fmt_fun, -- format function for workspace state name
-  fmt_tab: fmt_fun, -- format function for tab state name
-  fmt_date: fmt_fun, -- format function for date
-  show_state_with_date: boolean, -- show last update of the state file, default: false
-  date_format: string, -- date formatting, default: "%d-%m-%Y %H:%M:%S"
-  ignore_screen_width: boolean, -- whether or not to shrink the list if the window is too narrow, default: true
-  name_truncature: string, -- when state name is truncated, this string replaces the truncation
-  min_filename_size: number -- minimum size of state name in case of truncation
-}
-```
-
-This is used to format labels, ignore saved state, change the title and change the behaviour of the fuzzy finder.
 
 ### Change the directory to store the saved state
 
