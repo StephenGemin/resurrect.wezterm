@@ -36,6 +36,9 @@ function pub.restore_workspace(workspace_state, opts)
 				opts.tab = opts.window:active_tab()
 				if not opts.close_open_panes then
 					opts.pane = opts.window:active_pane()
+					-- This pane is being reused as-is, not spawned fresh with the
+					-- right cwd already set, so restore_tab needs to actually cd it.
+					opts.pane_needs_cd = true
 				end
 			end
 		else
