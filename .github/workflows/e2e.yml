@@ -1,0 +1,72 @@
+name: E2E smoke
+
+# Confirm the plugin loads and starts without error on all supported platforms.
+# This runs on push to main (and PRs during initial rollout — see note below).
+# Revert the pull_request trigger before merging the final version of this file.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  # Ubuntu needs an exact version to construct the .deb download URL.
+  # macOS (brew) and Windows (winget) always install the latest stable.
+  # Update this when a new WezTerm stable ships.
+  WEZTERM_VERSION: "20240203-110809-5046fc22"
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Xvfb (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y xvfb
+
+      - name: Start virtual display (Linux)
+        if: runner.os == 'Linux'
+        run: Xvfb :99 -screen 0 1280x800x24 &
+
+      - name: Install WezTerm (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL \
+            "https://github.com/wez/wezterm/releases/download/${WEZTERM_VERSION}/wezterm-${WEZTERM_VERSION}.Ubuntu22.04.deb" \
+            -o wezterm.deb
+          sudo apt-get install -y ./wezterm.deb
+
+      - name: Install WezTerm (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask wezterm
+
+      - name: Install WezTerm (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          winget install wez.wezterm --accept-package-agreements --accept-source-agreements --silent
+          # winget does not update the current process PATH; find and register the install location.
+          $candidates = @(
+            "$env:LOCALAPPDATA\Programs\WezTerm",
+            "$env:ProgramFiles\WezTerm"
+          )
+          foreach ($p in $candidates) {
+            if (Test-Path "$p\wezterm.exe") {
+              "$p" | Out-File -Append $env:GITHUB_PATH
+              break
+            }
+          }
+
+      - name: Run smoke test
+        shell: bash
+        run: |
+          [ "$RUNNER_OS" = "Linux" ] && export DISPLAY=:99
+          bash spec/e2e/smoke.sh
