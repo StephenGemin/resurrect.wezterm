@@ -21,7 +21,7 @@ package.path = repo_path .. sep .. "plugin" .. sep .. "?.lua;" .. package.path
 local resurrect = dofile(repo_path .. sep .. "plugin" .. sep .. "init.lua")
 
 local config = wezterm.config_builder()
-resurrect.Setup(config)
+resurrect.setup(config)
 
 -- Our handler fires after the plugin's gui-startup handler (registered by setup()).
 -- Writing the sentinel here proves: config loaded, setup() ran, gui-startup fired —
