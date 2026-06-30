@@ -11,9 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  # Ubuntu needs an exact version to construct the .deb download URL.
-  # macOS (brew) and Windows (winget) always install the latest stable.
-  # Update this when a new WezTerm stable ships.
+  # All platforms use this version. Update when a new WezTerm stable ships.
   WEZTERM_VERSION: "20240203-110809-5046fc22"
 
 jobs:
@@ -46,24 +44,24 @@ jobs:
 
       - name: Install WezTerm (macOS)
         if: runner.os == 'macOS'
-        run: brew install --cask wezterm
+        run: |
+          curl -fsSL \
+            "https://github.com/wez/wezterm/releases/download/${WEZTERM_VERSION}/WezTerm-macos-${WEZTERM_VERSION}.zip" \
+            -o wezterm-macos.zip
+          unzip -q wezterm-macos.zip
+          echo "$(pwd)/WezTerm.app/Contents/MacOS" >> "$GITHUB_PATH"
 
       - name: Install WezTerm (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          winget install wez.wezterm --accept-package-agreements --accept-source-agreements --silent
-          # winget does not update the current process PATH; find and register the install location.
-          $candidates = @(
-            "$env:LOCALAPPDATA\Programs\WezTerm",
-            "$env:ProgramFiles\WezTerm"
-          )
-          foreach ($p in $candidates) {
-            if (Test-Path "$p\wezterm.exe") {
-              "$p" | Out-File -Append $env:GITHUB_PATH
-              break
-            }
-          }
+          $ver = $env:WEZTERM_VERSION
+          Invoke-WebRequest `
+            "https://github.com/wez/wezterm/releases/download/$ver/WezTerm-windows-$ver.zip" `
+            -OutFile wezterm-windows.zip
+          Expand-Archive wezterm-windows.zip -DestinationPath wezterm-windows
+          $dir = (Get-ChildItem -Recurse -Filter wezterm.exe wezterm-windows | Select-Object -First 1).DirectoryName
+          $dir | Out-File -Append $env:GITHUB_PATH
 
       - name: Run smoke test
         shell: bash

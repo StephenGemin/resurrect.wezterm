@@ -20,7 +20,7 @@ else
 	export RESURRECT_SENTINEL="$SENTINEL_UNIX"
 fi
 
-wezterm --config-file spec/e2e/smoke_wezterm.lua start &
+wezterm --config-file spec/e2e/wezterm.lua start &
 WEZTERM_PID=$!
 
 cleanup() {
