@@ -105,10 +105,15 @@ function pub.restore_tab(tab, tab_state, opts)
 	wezterm.emit("resurrect.tab_state.restore_tab.start")
 	if opts.pane then
 		tab_state.pane_tree.pane = opts.pane
-		-- Set the CWD of the reused pane to match saved state
-		if tab_state.pane_tree.cwd and tab_state.pane_tree.cwd ~= "" then
+		-- Only needed when genuinely reusing an already-running pane (see
+		-- workspace_state.restore_workspace's active-pane reuse case). Panes spawned
+		-- fresh already have the right cwd from their spawn args; sending `cd` there
+		-- is a redundant command that ends up baked into scrollback and gets
+		-- replayed + re-saved on every future restore.
+		if opts.pane_needs_cd and tab_state.pane_tree.cwd and tab_state.pane_tree.cwd ~= "" then
 			opts.pane:send_text("cd " .. wezterm.shell_join_args({ tab_state.pane_tree.cwd }) .. "\r\n")
 		end
+		opts.pane_needs_cd = nil
 	else
 		local split_args = { cwd = tab_state.pane_tree.cwd }
 		if tab_state.pane_tree.domain then

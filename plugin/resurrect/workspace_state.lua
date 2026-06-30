@@ -36,6 +36,11 @@ function pub.restore_workspace(workspace_state, opts)
 				opts.tab = opts.window:active_tab()
 				if not opts.close_open_panes then
 					opts.pane = opts.window:active_pane()
+					-- Flagged explicitly rather than inferred at restore time by comparing
+					-- cwds: get_current_working_dir() isn't reliably populated immediately
+					-- after a fresh spawn, so a runtime comparison would race for the
+					-- common case.
+					opts.pane_needs_cd = true
 				end
 			end
 		else
