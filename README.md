@@ -60,16 +60,28 @@ resurrect.setup(config, {
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
-  keybindings       = true,  -- Alt+W/S/Shift+W/Shift+T/R/D bindings; set false to use your own
+  keybindings       = true,  -- set false to define your own (see below)
   status_bar        = true,  -- show last save time and tab titles in the right status bar
 })
 ```
 
+When `keybindings = true`, the following bindings are added:
+
+| Key | Action |
+|-----|--------|
+| `Alt+W` | Save workspace |
+| `Alt+S` | Save workspace + current window |
+| `Alt+Shift+W` | Save window (prompts for name on first use) |
+| `Alt+Shift+T` | Save tab (prompts for name on first use) |
+| `Alt+R` | Fuzzy restore saved state |
+| `Alt+D` | Fuzzy delete saved state |
+
 > [!NOTE]
 > `save_windows` and `save_tabs` only auto-save entities you have explicitly named via
-> `save_window_action()` or `save_tab_action()`. Unnamed windows and tabs are skipped.
-> Workspaces always save; an unnamed workspace saves under its WezTerm name (default: `"default"`).
-> Saving to a name that already exists overwrites the file — this applies to all three types.
+> `save_window_action()` (`Alt+Shift+W`) or `save_tab_action()` (`Alt+Shift+T`). Unnamed
+> windows and tabs are skipped. Workspaces always save; an unnamed workspace saves under
+> its WezTerm name (default: `"default"`). Saving to a name that already exists overwrites
+> the file — this applies to all three types.
 
 To define your own keybindings, set `keybindings = false` and see [Saving state](#saving-state),
 [Restoring state](#restoring-state), and [Deleting state](#deleting-state) in Advanced Setup.
@@ -257,8 +269,8 @@ end),
 ---@alias fmt_fun fun(label: string): string
 ---@alias fuzzy_load_opts {
   title: string,               -- dialog title, default: "Load state"
-  description: string,         -- description shown above the picker
-  fuzzy_description: string,   -- description in fuzzy search mode
+  description: string,         -- description shown above the picker, default: "Select State to Load and press Enter = accept, Esc = cancel, / = filter"
+  fuzzy_description: string,   -- description in fuzzy search mode, default: "Search State to Load: "
   is_fuzzy: boolean,           -- enter directly in fuzzy mode, default: true
   ignore_workspaces: boolean,  -- hide workspace entries, default: false
   ignore_tabs: boolean,        -- hide tab entries, default: false
