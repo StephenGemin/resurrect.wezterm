@@ -91,9 +91,7 @@ function pub.save_workspace_action()
 end
 
 ---Returns a wezterm action that prompts for a name and switches to that
----workspace, creating it if it doesn't already exist. Confirming with no name
----(pressing enter on an empty prompt) switches to "default"; escaping the
----prompt does nothing.
+---workspace, creating it if it doesn't already exist.
 ---@return table wezterm action
 function pub.create_workspace_action()
 	return wezterm.action_callback(function(win, pane)
@@ -101,11 +99,8 @@ function pub.create_workspace_action()
 			wezterm.action.PromptInputLine({
 				description = "Enter a name for the new workspace",
 				action = wezterm.action_callback(function(window, inner_pane, name)
-					if name then
-						window:perform_action(
-							wezterm.action.SwitchToWorkspace({ name = name ~= "" and name or "default" }),
-							inner_pane
-						)
+					if name and name ~= "" then
+						window:perform_action(wezterm.action.SwitchToWorkspace({ name = name }), inner_pane)
 					end
 				end),
 			}),

@@ -137,9 +137,6 @@ config.keys = {
 }
 ```
 
-Confirming with no name (pressing enter on an empty prompt) switches to `"default"`.
-Escaping the prompt does nothing.
-
 This only switches the active workspace; it does not save anything. Save the new
 workspace's state with `save_workspace_action()` (below) once you're in it.
 
