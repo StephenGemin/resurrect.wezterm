@@ -97,7 +97,7 @@ function pub.create_workspace_action()
 	return wezterm.action_callback(function(win, pane)
 		win:perform_action(
 			wezterm.action.PromptInputLine({
-				description = "Enter a name for the new workspace",
+				description = "Enter a name for the new workspace | no name is a no-op",
 				action = wezterm.action_callback(function(window, inner_pane, name)
 					if name and name ~= "" then
 						window:perform_action(wezterm.action.SwitchToWorkspace({ name = name }), inner_pane)
