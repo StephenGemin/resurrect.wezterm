@@ -25,6 +25,7 @@ describe("public API surface (README contract)", function()
 			get_workspace_state = "function",
 			restore_workspace = "function",
 			save_workspace_action = "function",
+			create_workspace_action = "function",
 		},
 		["resurrect.window_state"] = {
 			get_window_state = "function",

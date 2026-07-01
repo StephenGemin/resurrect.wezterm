@@ -72,11 +72,7 @@ function pub.periodic_save(opts)
 		local ok, err = pcall(function()
 			wezterm.emit("resurrect.state_manager.periodic_save.start", opts)
 			if opts.save_workspaces then
-				local ws_state = require("resurrect.workspace_state").get_workspace_state()
-				if pub.is_user_named(ws_state.workspace, "workspace") then
-					ws_state.user_named = true
-				end
-				pub.save_state(ws_state)
+				pub.save_state(require("resurrect.workspace_state").get_workspace_state())
 			end
 
 			if opts.save_windows then
@@ -143,9 +139,6 @@ function pub.event_driven_save(opts)
 
 		if opts.save_workspaces then
 			local workspace_state = require("resurrect.workspace_state").get_workspace_state()
-			if pub.is_user_named(workspace_state.workspace, "workspace") then
-				workspace_state.user_named = true
-			end
 			pub.save_state(workspace_state)
 			pub.write_current_state(workspace_state.workspace, "workspace")
 		end

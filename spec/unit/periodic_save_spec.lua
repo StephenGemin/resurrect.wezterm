@@ -43,17 +43,6 @@ describe("state_manager.periodic_save", function()
 		assert.are.equal("snapshot", saved[1].workspace)
 	end)
 
-	it("re-stamps user_named on a previously user-named workspace", function()
-		state_manager.is_user_named = function()
-			return true
-		end
-		state_manager.periodic_save()
-		local call = helper.find_call(rec, "call_after")
-		call.fn()
-
-		assert.is_true(saved[1].user_named)
-	end)
-
 	it("honours a custom interval and skips workspaces when disabled", function()
 		state_manager.periodic_save({ interval_seconds = 5, save_workspaces = false })
 		local call = helper.find_call(rec, "call_after")

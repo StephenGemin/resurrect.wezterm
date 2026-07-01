@@ -359,8 +359,6 @@ function pub.delete_action(opts)
 					require("resurrect.tab_state").on_state_deleted(name)
 				elseif state_type == "window" then
 					require("resurrect.window_state").on_state_deleted(name)
-				elseif state_type == "workspace" then
-					require("resurrect.workspace_state").on_state_deleted(name)
 				end
 			end
 		end, delete_opts)
