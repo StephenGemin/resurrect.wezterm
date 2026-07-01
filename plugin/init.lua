@@ -115,9 +115,16 @@ function pub.setup(config, opts)
 		end)
 	end
 
-	-- Default keybindings for save/restore/delete
+	-- Default keybindings for create/save/restore/delete
 	if opts.keybindings ~= false then
 		config.keys = config.keys or {}
+
+		-- Alt+Shift+N: create workspace
+		table.insert(config.keys, {
+			key = "N",
+			mods = "ALT|SHIFT",
+			action = pub.workspace_state.create_workspace_action(),
+		})
 
 		-- Alt+W: save workspace
 		table.insert(config.keys, {

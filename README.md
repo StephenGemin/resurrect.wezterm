@@ -6,24 +6,41 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 
 ## Table of Contents
 
-- [Features](#features)
-- [Basic Setup](#basic-setup)
-  - [Setup Options](#setup-options)
-- [Advanced Setup](#advanced-setup)
-  - [Resurrecting on startup](#resurrecting-on-startup)
-  - [Saving state](#saving-state)
-  - [Restoring state](#restoring-state)
-  - [Deleting state](#deleting-state)
-  - [Encryption (optional, recommended)](#encryption-optional-recommended)
-- [Configuration](#configuration)
-  - [Configuration reference](#configuration-reference)
-  - [Change the directory to store the saved state](#change-the-directory-to-store-the-saved-state)
-  - [Events](#events)
-- [State files](#state-files)
-- [Augmenting the command palette](#augmenting-the-command-palette)
-- [FAQ](#faq)
-- [Contributions](#contributions)
-- [Disclaimer](#disclaimer)
+- [resurrect.wezterm](#resurrectwezterm)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Basic Setup](#basic-setup)
+    - [Setup Options](#setup-options)
+  - [Advanced Setup](#advanced-setup)
+    - [Resurrecting on startup](#resurrecting-on-startup)
+    - [Creating a workspace](#creating-a-workspace)
+    - [Saving state](#saving-state)
+    - [Restoring state](#restoring-state)
+      - [restore\_opts](#restore_opts)
+      - [Restoring into the current window](#restoring-into-the-current-window)
+      - [Windows not resizing correctly](#windows-not-resizing-correctly)
+      - [Manual dispatch](#manual-dispatch)
+      - [fuzzy\_load opts](#fuzzy_load-opts)
+    - [Deleting state](#deleting-state)
+      - [Manual dispatch](#manual-dispatch-1)
+    - [Encryption (optional, recommended)](#encryption-optional-recommended)
+      - [Install and generate a key](#install-and-generate-a-key)
+      - [Enable encryption in your config](#enable-encryption-in-your-config)
+      - [Custom encryption providers](#custom-encryption-providers)
+  - [Configuration](#configuration)
+    - [Configuration reference](#configuration-reference)
+    - [Change the directory to store the saved state](#change-the-directory-to-store-the-saved-state)
+    - [Events](#events)
+  - [State files](#state-files)
+  - [Augmenting the command palette](#augmenting-the-command-palette)
+  - [FAQ](#faq)
+    - [Pane CWD is not correct on Windows](#pane-cwd-is-not-correct-on-windows)
+    - [How do I keep my plugins up to date?](#how-do-i-keep-my-plugins-up-to-date)
+      - [Manually](#manually)
+      - [Automatically](#automatically)
+  - [Contributions](#contributions)
+    - [Technical details](#technical-details)
+  - [Disclaimer](#disclaimer)
 
 ## Features
 
@@ -69,6 +86,7 @@ When `keybindings = true`, the following bindings are added:
 
 | Key | Action |
 |-----|--------|
+| `Alt+Shift+N` | Create workspace |
 | `Alt+W` | Save workspace |
 | `Alt+S` | Save workspace + current window |
 | `Alt+Shift+W` | Save window (prompts for name on first use) |
@@ -102,10 +120,31 @@ This reads the current state file written by `periodic_save` and `event_driven_s
 whenever `save_workspaces = true`. `setup()` wires this up automatically — only add
 it manually if you are not using `setup()`.
 
+### Creating a workspace
+
+Bind `create_workspace_action()` to prompt for a name and switch to (or create) that
+workspace — a thin wrapper around wezterm's own `PromptInputLine` +
+`SwitchToWorkspace` pattern:
+
+```lua
+config.keys = {
+  -- ...
+  {
+    key = "N",
+    mods = "ALT|SHIFT",
+    action = resurrect.workspace_state.create_workspace_action(),
+  },
+}
+```
+
+This only switches the active workspace; it does not save anything. Save the new
+workspace's state with `save_workspace_action()` (below) once you're in it.
+
 ### Saving state
 
 Bind save actions to keys. Each action function takes no arguments — the naming prompt
-and silent re-save behaviour are handled automatically (see the note below):
+for windows/tabs and silent re-save behaviour are handled automatically (see the note
+below). Workspaces are never prompted for a name on save; see [Creating a workspace](#creating-a-workspace).
 
 ```lua
 local wezterm = require("wezterm")
