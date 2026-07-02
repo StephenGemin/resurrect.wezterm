@@ -217,15 +217,15 @@ function pub.default_on_pane_restore(pane_tree)
 			end
 		else
 			-- base_name comes from process.name, which some programs set to something
-			-- other than their executable (e.g. a version string) -- log argv/executable
-			-- too so the actual command is identifiable, not just that opaque name.
+			-- other than their executable (e.g. a version string) -- log the executable
+			-- path too so the actual command is identifiable, not just that opaque name.
+			-- argv is deliberately omitted: it can carry secrets (tokens, passwords) that
+			-- shouldn't end up in the log.
 			wezterm.log_warn(
 				"resurrect: skipping restore of unrecognized process: "
 					.. base_name
 					.. " (executable: "
 					.. (pane_tree.process.executable or "?")
-					.. ", argv: "
-					.. wezterm.shell_join_args(pane_tree.process.argv)
 					.. ") (add to SAFE_RESTORE_PROCESSES if intended)"
 			)
 		end
