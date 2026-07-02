@@ -12,6 +12,7 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
   - [Basic Setup](#basic-setup)
     - [Setup Options](#setup-options)
   - [Migrating from MLFlexer's resurrect.wezterm](#migrating-from-mlflexers-resurrectwezterm)
+    - [Migrating state files manually (optional)](#migrating-state-files-manually-optional)
   - [Advanced Setup](#advanced-setup)
     - [Resurrecting on startup](#resurrecting-on-startup)
     - [Creating a workspace](#creating-a-workspace)
@@ -114,24 +115,10 @@ lives in a fixed, OS-standard data directory instead. That means **swapping only
 `require()` URL will not bring your old saved sessions forward** — they need to be copied
 over once.
 
-1. Update the require URL in your `wezterm.lua`:
-
-   ```lua
-   local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
-   ```
-
-2. *(Optional — only if you want your old saved sessions available here)* copy your old
-   state files into the new default directory:
-
-   | OS | Old location (inside the MLFlexer plugin clone) | New location |
-   |----|---------------------------------------------------|--------------|
-   | macOS | `<plugin clone dir>/state/` | `~/Library/Application Support/wezterm/resurrect/` |
-   | Linux | `<plugin clone dir>/state/` | `$XDG_DATA_HOME/wezterm/resurrect/` (or `~/.local/share/wezterm/resurrect/`) |
-   | Windows | `<plugin clone dir>\state\` | `%APPDATA%\wezterm\resurrect\` |
-
-   Find your old plugin clone dir via `wezterm.plugin.list()` in the Wezterm Debug
-   Overlay (`Ctrl + Shift + L`), or run the migration script, which locates it and copies
-   the files for you (never overwrites existing files at the destination):
+1. *(Optional — only if you want your old saved sessions available here)* run the
+   migration script to copy your old state files into the new default directory. It
+   only copies files — it never touches your `wezterm.lua` or deletes anything, and
+   never overwrites existing files at the destination:
 
    ```sh
    bash scripts/migrate-from-mlflexer.sh
@@ -139,16 +126,31 @@ over once.
 
    On Windows, run this from a Git Bash terminal (ships with
    [Git for Windows](https://git-scm.com/downloads/win)) — the script fails with a clear
-   error rather than doing the wrong thing if Git Bash isn't available.
+   error rather than doing the wrong thing if Git Bash isn't available. If something
+   looks off, its output is meant to be pasted directly into a GitHub issue.
 
-   The script only prints what it's doing and copies files — it doesn't touch your
-   `wezterm.lua` or delete anything. If something looks off, its output is meant to be
-   pasted directly into a GitHub issue.
+2. Update the require URL in your `wezterm.lua`:
+
+   ```lua
+   local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
+   ```
 
 3. Restart WezTerm (or run `wezterm.reload_configuration()`).
 
 4. Once you've confirmed your old sessions restore correctly, you can delete the old
    MLFlexer plugin directory manually.
+
+### Migrating state files manually (optional)
+
+Prefer not to run the script? Find your old plugin clone dir via `wezterm.plugin.list()`
+in the Wezterm Debug Overlay (`Ctrl + Shift + L`), then copy its state files across
+yourself:
+
+| OS | Old location (inside the MLFlexer plugin clone) | New location |
+|----|---------------------------------------------------|--------------|
+| macOS | `<plugin clone dir>/state/` | `~/Library/Application Support/wezterm/resurrect/` |
+| Linux | `<plugin clone dir>/state/` | `$XDG_DATA_HOME/wezterm/resurrect/` (or `~/.local/share/wezterm/resurrect/`) |
+| Windows | `<plugin clone dir>\state\` | `%APPDATA%\wezterm\resurrect\` |
 
 The saved-state JSON schema is unchanged, so copied files load without any conversion.
 
