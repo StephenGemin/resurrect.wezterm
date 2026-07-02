@@ -56,6 +56,16 @@ function pub.restore_workspace(workspace_state, opts)
 		window_state_mod.restore_window(opts.window, window_state, opts)
 	end
 
+	-- window_states can be saved empty (e.g. a save-time mux race), in which case
+	-- the loop above never spawned or reused a window for this workspace. Switching
+	-- into it below would then crash with "<name> is not an existing workspace".
+	if opts.window == nil then
+		wezterm.log_warn(
+			"resurrect: workspace '" .. tostring(workspace_state.workspace) .. "' has no windows to restore; skipping"
+		)
+		return
+	end
+
 	-- Switch the active workspace to the one just restored, so the user actually
 	-- lands in it rather than staying in (or being dropped into) another workspace.
 	-- Backwards compatible: when `switch_workspace` is unset we fall back to the
