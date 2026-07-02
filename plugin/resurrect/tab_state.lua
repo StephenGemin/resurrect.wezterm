@@ -216,10 +216,17 @@ function pub.default_on_pane_restore(pane_tree)
 				pane:send_text(cmd)
 			end
 		else
+			-- base_name comes from process.name, which some programs set to something
+			-- other than their executable (e.g. a version string) -- log argv/executable
+			-- too so the actual command is identifiable, not just that opaque name.
 			wezterm.log_warn(
 				"resurrect: skipping restore of unrecognized process: "
 					.. base_name
-					.. " (add to SAFE_RESTORE_PROCESSES if intended)"
+					.. " (executable: "
+					.. (pane_tree.process.executable or "?")
+					.. ", argv: "
+					.. wezterm.shell_join_args(pane_tree.process.argv)
+					.. ") (add to SAFE_RESTORE_PROCESSES if intended)"
 			)
 		end
 	elseif pane_tree.text then
