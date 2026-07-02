@@ -33,6 +33,9 @@ spec/
   spec_helper.lua            shared wezterm mock and module loader for busted specs
   unit/                      unit tests (busted --run=unit)
   integration/               integration tests; require lunajson (busted --run=integration)
+scripts/
+  migrate-from-mlflexer.sh   copies old MLFlexer state files into this fork's default dir
+                             (macOS, Linux, Windows via Git Bash)
 README.md
 AGENTS.md                    (this file)
 CLAUDE.md                    AI assistant guidance
