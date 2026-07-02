@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copy saved state from MLFlexer's original resurrect.wezterm into this fork's
-# default state directory. macOS/Linux only — see migrate-from-mlflexer.ps1 for Windows.
+# default state directory. Works on macOS, Linux, and Windows via Git Bash.
 #
 # Non-destructive: only copies files, never deletes or overwrites. Does not touch
 # your wezterm.lua — update the `wezterm.plugin.require(...)` URL yourself.
@@ -55,6 +55,7 @@ echo "[INFO] uname -a:    $(uname -a 2>/dev/null || echo '<unavailable>')"
 echo "[INFO] bash:        ${BASH_VERSION:-<unavailable>}"
 echo "[INFO] HOME:        ${HOME:-<unset>}"
 echo "[INFO] XDG_DATA_HOME: ${XDG_DATA_HOME:-<unset>}"
+echo "[INFO] APPDATA:     ${APPDATA:-<unset>}"
 if command -v wezterm >/dev/null 2>&1; then
 	echo "[INFO] wezterm:     $(wezterm --version 2>/dev/null || echo '<version query failed>')"
 else
@@ -73,8 +74,26 @@ Linux)
 	PLUGINS_DIR="${DATA_HOME}/wezterm/plugins"
 	NEW_STATE_DIR="${DATA_HOME}/wezterm/resurrect"
 	;;
+MINGW* | MSYS* | CYGWIN*)
+	# Git Bash / MSYS. %APPDATA% is a native Windows path (backslashes) — bash's own
+	# glob treats "\" as an escape char, not a separator, so it must be converted to a
+	# POSIX path before use. cygpath ships with Git for Windows.
+	if ! command -v cygpath >/dev/null 2>&1; then
+		log_fail "cygpath not found. This script requires Git Bash (Git for Windows), which provides it."
+		print_summary "MISSING_CYGPATH"
+		exit 1
+	fi
+	if [ -z "${APPDATA:-}" ]; then
+		log_fail "APPDATA environment variable is not set — cannot locate the WezTerm data directory."
+		print_summary "MISSING_APPDATA"
+		exit 1
+	fi
+	APPDATA_POSIX="$(cygpath -u "${APPDATA}")"
+	PLUGINS_DIR="${APPDATA_POSIX}/wezterm/plugins"
+	NEW_STATE_DIR="${APPDATA_POSIX}/wezterm/resurrect"
+	;;
 *)
-	log_fail "unsupported OS '${OS}'. This script supports macOS and Linux; use migrate-from-mlflexer.ps1 on Windows."
+	log_fail "unsupported OS '${OS}'. This script supports macOS, Linux, and Windows (via Git Bash)."
 	print_summary "UNSUPPORTED_OS"
 	exit 1
 	;;

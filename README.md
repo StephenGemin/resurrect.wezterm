@@ -134,12 +134,12 @@ over once.
    the files for you (never overwrites existing files at the destination):
 
    ```sh
-   # macOS / Linux
    bash scripts/migrate-from-mlflexer.sh
-
-   # Windows (PowerShell)
-   pwsh scripts/migrate-from-mlflexer.ps1
    ```
+
+   On Windows, run this from a Git Bash terminal (ships with
+   [Git for Windows](https://git-scm.com/downloads/win)) — the script fails with a clear
+   error rather than doing the wrong thing if Git Bash isn't available.
 
    The script only prints what it's doing and copies files — it doesn't touch your
    `wezterm.lua` or delete anything. If something looks off, its output is meant to be
