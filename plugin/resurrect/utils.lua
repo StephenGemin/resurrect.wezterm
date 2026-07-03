@@ -2,8 +2,8 @@ local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes 
 
 local utils = {}
 
-utils.is_windows = wezterm.target_triple == "x86_64-pc-windows-msvc"
-utils.is_mac = (wezterm.target_triple == "x86_64-apple-darwin" or wezterm.target_triple == "aarch64-apple-darwin")
+utils.is_windows = wezterm.target_triple:find("windows")
+utils.is_mac = wezterm.target_triple:find("darwin")
 utils.separator = utils.is_windows and "\\" or "/"
 
 ---Returns the platform-appropriate directory for persisting resurrect.wezterm state.
