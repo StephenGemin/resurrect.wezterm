@@ -3,7 +3,6 @@
 -- that the expected file exists on disk before writing the sentinel.
 --
 -- Run via: RESURRECT_REPO_PATH=<abs-path> RESURRECT_SENTINEL=<file> \
---          RESURRECT_SAVE_DIR=<dir-with-trailing-sep> \
 --          wezterm --config-file spec/e2e/wezterm_save.lua start
 
 local wezterm = require("wezterm")
@@ -16,8 +15,7 @@ local resurrect = dofile(repo_path .. sep .. "plugin" .. sep .. "init.lua")
 local config = wezterm.config_builder()
 
 wezterm.on("gui-startup", function()
-	local save_dir = os.getenv("RESURRECT_SAVE_DIR")
-		or (repo_path .. sep .. ".resurrect_e2e_state" .. sep)
+	local save_dir = repo_path .. sep .. ".resurrect_e2e_state" .. sep
 	resurrect.state_manager.change_state_save_dir(save_dir)
 
 	local ws_state = resurrect.workspace_state.get_workspace_state()
