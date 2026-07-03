@@ -176,52 +176,6 @@ local function shell_mkdir(path)
 	end
 end
 
--- Normalise separators and strip the root prefix from path.
--- Returns the platform separator, the root component (e.g. "C:\", "/", "\\"),
--- and the remaining path with the root removed.
--- On Windows forward slashes are converted to backslashes before parsing.
----@param path string
----@return string sep, string root, string stripped
-local function parse_root(path)
-	local sep
-	if utils.is_windows then
-		sep = "\\"
-		path = path:gsub("/", sep)
-	else
-		sep = "/"
-	end
-
-	local root = ""
-	if utils.is_windows then
-		local drive = path:match("^(%a:)[/\\]")
-		if drive then
-			-- Absolute path (e.g. C:\foo): capture "C:", append sep to form "C:\",
-			-- then strip the 3-char prefix so the remainder is "foo\...".
-			root = drive .. sep
-			path = path:sub(4)
-		elseif path:match("^%a:[^/\\]") then
-			-- Drive-relative path (e.g. C:foo); normalise to absolute from drive root.
-			-- Strip the 2-char "C:" prefix; root gets the explicit separator added.
-			root = path:sub(1, 2) .. sep
-			path = path:sub(3)
-		elseif path:sub(1, 2) == "\\\\" then
-			-- UNC path (e.g. \\server\share\...): strip the 2-char "\\" prefix.
-			-- The server and share components cannot be created via mkdir;
-			-- this only works when the share already exists.
-			root = "\\\\"
-			path = path:sub(3)
-		end
-	else
-		if path:sub(1, 1) == "/" then
-			-- Absolute Unix path: strip the leading separator; root is "/".
-			root = "/"
-			path = path:sub(2)
-		end
-	end
-
-	return sep, root, path
-end
-
 -- Probe-write check: attempts to create and immediately remove a temp file
 -- inside path. More reliable than os.rename on Windows, where open handles
 -- held by WezTerm itself cause os.rename(dir, dir) to return nil even when
@@ -239,54 +193,53 @@ local function dir_is_accessible(path)
 	return false
 end
 
--- Ensure a single already-assembled path exists, creating it if necessary.
--- Returns false if the directory could not be created or verified.
----@param path string
----@return boolean
-local function mkdir_if_missing(path)
-	-- Probe-write is the primary existence check. os.rename is skipped because
-	-- it gives false negatives on Windows when WezTerm holds open handles,
-	-- which would cause shell_mkdir to be called on every startup for
-	-- directories that already exist, producing visible cmd.exe window flashes.
-	if dir_is_accessible(path) then
-		return true
-	end
-	if shell_mkdir(path) then
-		-- Post-verify: confirm the directory is actually usable after creation.
-		return dir_is_accessible(path)
-	end
-	return false
-end
-
 -- Create the folder if it does not exist.
--- On Unix, delegates to `mkdir -p` which creates all missing parents in one
--- shot and is idempotent.
--- On Windows, `mkdir` requires each parent to already exist, so we iterate
--- component by component. Drive-relative paths (e.g. C:foo\bar) are
--- normalised to absolute. UNC paths (\\server\share\...) are supported only
--- when the server and share already exist.
+-- `mkdir -p` (Unix) and cmd's `mkdir` (Windows) both create all missing
+-- parent directories in a single call, so only the leaf directory itself
+-- needs to be checked/created. Walking and probe-writing every ancestor
+-- (the previous approach) is unnecessary overhead, and on Windows it also
+-- re-triggers shell_mkdir -- a visible cmd.exe flash -- on every launch for
+-- any ancestor the current user can't write to (e.g. C:\Users on a
+-- non-admin account), even though the leaf directory already exists.
+-- Drive-relative paths (e.g. C:foo\bar) are normalised to absolute so cmd's
+-- mkdir doesn't interpret them relative to the current directory on that
+-- drive. UNC paths (\\server\share\...) are supported only when the server
+-- and share already exist.
 -- Path components are not sanitized; . and .. segments produce undefined behavior.
 ---@param path string
 ---@return boolean success
 function utils.ensure_folder_exists(path)
-	if not utils.is_windows then
-		return shell_mkdir(path) and dir_is_accessible(path)
-	end
-	local sep, root, stripped = parse_root(path)
-	local current = root
-	for part in string.gmatch(stripped, "[^" .. sep .. "]+") do
-		if current == "" then
-			current = part
-		elseif current:sub(-1) == sep then
-			current = current .. part
-		else
-			current = current .. sep .. part
-		end
-		if not mkdir_if_missing(current) then
-			return false
+	if utils.is_windows then
+		path = path:gsub("/", "\\")
+		local drive = path:match("^(%a:)[^\\]")
+		if drive then
+			path = drive .. "\\" .. path:sub(3)
 		end
 	end
-	return true
+	path = path:gsub("[/\\]+$", "")
+	if path == "" then
+		return true
+	end
+	if dir_is_accessible(path) then
+		return true
+	end
+	-- Logged because this is the call that can flash a console window on
+	-- Windows/WSL; if a future report says it fires every launch instead of
+	-- once, this line (grep the wezterm log for "resurrect.utils") is the
+	-- fastest way to confirm it and see which path is involved.
+	local created = shell_mkdir(path)
+	wezterm.log_info(
+		("resurrect.utils: ensure_folder_exists creating %s (platform=%s) -> %s"):format(
+			path,
+			utils.is_windows and "windows" or "unix",
+			created and "ok" or "failed"
+		)
+	)
+	if created then
+		-- Post-verify: confirm the directory is actually usable after creation.
+		return dir_is_accessible(path)
+	end
+	return false
 end
 
 -- deep copy
