@@ -134,7 +134,12 @@ function pub.restore_tab(tab, tab_state, opts)
 	end
 
 	local acc = pane_tree_mod.fold(tab_state.pane_tree, { is_zoomed = false }, make_splits(opts))
-	acc.active_pane:activate()
+	-- acc.active_pane is only set if some node in the saved tree has is_active
+	-- true; a malformed or hand-edited state file can omit that, which would
+	-- otherwise crash the whole restore here.
+	if acc.active_pane then
+		acc.active_pane:activate()
+	end
 	wezterm.emit("resurrect.tab_state.restore_tab.finished")
 end
 
