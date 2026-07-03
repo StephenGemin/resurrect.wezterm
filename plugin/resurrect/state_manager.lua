@@ -59,6 +59,42 @@ function pub.load_state(name, type)
 	return json
 end
 
+-- Shared by periodic_save and event_driven_save: saves workspace state and
+-- keeps current_state pointed at it, so both paths stay restore-on-startup-safe.
+local function save_workspace()
+	local workspace_state = require("resurrect.workspace_state").get_workspace_state()
+	pub.save_state(workspace_state)
+	pub.write_current_state(workspace_state.workspace, "workspace")
+end
+
+-- Shared by periodic_save (all gui windows) and event_driven_save (the single
+-- window from the triggering event) to save user-named windows/tabs.
+---@param mux_windows MuxWindow[]
+---@param opts { save_windows: boolean?, save_tabs: boolean? }
+local function save_named_windows_and_tabs(mux_windows, opts)
+	for _, mux_win in ipairs(mux_windows) do
+		if opts.save_windows then
+			local title = mux_win:get_title()
+			if title and title ~= "" and pub.is_user_named(title, "window") then
+				local state = require("resurrect.window_state").get_window_state(mux_win)
+				state.user_named = true
+				pub.save_state(state)
+			end
+		end
+
+		if opts.save_tabs then
+			for _, mux_tab in ipairs(mux_win:tabs()) do
+				local title = mux_tab:get_title()
+				if title and title ~= "" and pub.is_user_named(title, "tab") then
+					local state = require("resurrect.tab_state").get_tab_state(mux_tab)
+					state.user_named = true
+					pub.save_state(state)
+				end
+			end
+		end
+	end
+end
+
 ---Saves the stater after interval in seconds
 ---@param opts? { interval_seconds: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean? }
 function pub.periodic_save(opts)
@@ -72,35 +108,15 @@ function pub.periodic_save(opts)
 		local ok, err = pcall(function()
 			wezterm.emit("resurrect.state_manager.periodic_save.start", opts)
 			if opts.save_workspaces then
-				local workspace_state = require("resurrect.workspace_state").get_workspace_state()
-				pub.save_state(workspace_state)
-				pub.write_current_state(workspace_state.workspace, "workspace")
+				save_workspace()
 			end
 
-			if opts.save_windows then
+			if opts.save_windows or opts.save_tabs then
+				local mux_windows = {}
 				for _, gui_win in ipairs(wezterm.gui.gui_windows()) do
-					local mux_win = gui_win:mux_window()
-					local title = mux_win:get_title()
-					if title and title ~= "" and pub.is_user_named(title, "window") then
-						local state = require("resurrect.window_state").get_window_state(mux_win)
-						state.user_named = true
-						pub.save_state(state)
-					end
+					table.insert(mux_windows, gui_win:mux_window())
 				end
-			end
-
-			if opts.save_tabs then
-				for _, gui_win in ipairs(wezterm.gui.gui_windows()) do
-					local mux_win = gui_win:mux_window()
-					for _, mux_tab in ipairs(mux_win:tabs()) do
-						local title = mux_tab:get_title()
-						if title and title ~= "" and pub.is_user_named(title, "tab") then
-							local state = require("resurrect.tab_state").get_tab_state(mux_tab)
-							state.user_named = true
-							pub.save_state(state)
-						end
-					end
-				end
+				save_named_windows_and_tabs(mux_windows, opts)
 			end
 
 			wezterm.emit("resurrect.state_manager.periodic_save.finished", opts)
@@ -140,31 +156,11 @@ function pub.event_driven_save(opts)
 		wezterm.emit("resurrect.state_manager.event_driven_save.start", opts)
 
 		if opts.save_workspaces then
-			local workspace_state = require("resurrect.workspace_state").get_workspace_state()
-			pub.save_state(workspace_state)
-			pub.write_current_state(workspace_state.workspace, "workspace")
+			save_workspace()
 		end
 
-		if opts.save_windows then
-			local mux_win = window:mux_window()
-			local title = mux_win:get_title()
-			if title ~= "" and title ~= nil and pub.is_user_named(title, "window") then
-				local state = require("resurrect.window_state").get_window_state(mux_win)
-				state.user_named = true
-				pub.save_state(state)
-			end
-		end
-
-		if opts.save_tabs then
-			local mux_win = window:mux_window()
-			for _, mux_tab in ipairs(mux_win:tabs()) do
-				local title = mux_tab:get_title()
-				if title ~= "" and title ~= nil and pub.is_user_named(title, "tab") then
-					local state = require("resurrect.tab_state").get_tab_state(mux_tab)
-					state.user_named = true
-					pub.save_state(state)
-				end
-			end
+		if opts.save_windows or opts.save_tabs then
+			save_named_windows_and_tabs({ window:mux_window() }, opts)
 		end
 
 		wezterm.emit("resurrect.state_manager.event_driven_save.finished", opts)
