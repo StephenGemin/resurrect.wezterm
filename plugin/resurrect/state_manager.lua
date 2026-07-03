@@ -72,7 +72,9 @@ function pub.periodic_save(opts)
 		local ok, err = pcall(function()
 			wezterm.emit("resurrect.state_manager.periodic_save.start", opts)
 			if opts.save_workspaces then
-				pub.save_state(require("resurrect.workspace_state").get_workspace_state())
+				local workspace_state = require("resurrect.workspace_state").get_workspace_state()
+				pub.save_state(workspace_state)
+				pub.write_current_state(workspace_state.workspace, "workspace")
 			end
 
 			if opts.save_windows then
@@ -216,12 +218,14 @@ function pub.resurrect_on_gui_startup()
 	local suc, err = pcall(function()
 		local file = io.open(file_path, "r")
 		if not file then
+			wezterm.log_info("resurrect: no current_state file at " .. file_path .. "; skipping startup restore")
 			return
 		end
 		local name = file:read("*line")
 		local state_type = file:read("*line")
 		file:close()
 		if state_type == "workspace" then
+			wezterm.log_info("resurrect: restoring workspace '" .. tostring(name) .. "' on gui-startup")
 			require("resurrect.workspace_state").restore_workspace(pub.load_state(name, state_type), {
 				spawn_in_workspace = true,
 				relative = true,
@@ -229,6 +233,14 @@ function pub.resurrect_on_gui_startup()
 				on_pane_restore = require("resurrect.tab_state").default_on_pane_restore,
 			})
 			wezterm.mux.set_active_workspace(name)
+		else
+			wezterm.log_info(
+				"resurrect: current_state at "
+					.. file_path
+					.. " has type '"
+					.. tostring(state_type)
+					.. "', not 'workspace'; skipping startup restore"
+			)
 		end
 	end)
 	if not suc then
