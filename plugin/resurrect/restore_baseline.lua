@@ -75,11 +75,11 @@ function pub.register(pane, text)
 	local ok, rendered = pcall(utils.capture_pane_text, pane, max_nlines)
 	if not ok then
 		_baselines[pane_id] = nil
-		wezterm.log_debug(("resurrect.restore_baseline: pane %d register capture failed, not tracking"):format(pane_id))
+		wezterm.log_info(("resurrect.restore_baseline: pane %d register capture failed, not tracking"):format(pane_id))
 		return
 	end
 	local rendered_rows = count_rows(rendered)
-	wezterm.log_debug(
+	wezterm.log_info(
 		("resurrect.restore_baseline: pane %d registered replay (%d bytes, %d rendered rows)"):format(
 			pane_id,
 			#text,
@@ -94,7 +94,7 @@ function pub.register(pane, text)
 		local snap_ok, snapshot = pcall(utils.capture_pane_text, pane, max_nlines)
 		if not snap_ok then
 			_baselines[pane_id] = nil
-			wezterm.log_debug(
+			wezterm.log_info(
 				("resurrect.restore_baseline: pane %d settle capture failed, not tracking"):format(pane_id)
 			)
 			return
@@ -102,7 +102,7 @@ function pub.register(pane, text)
 		local snapshot_rows = count_rows(snapshot)
 		if snapshot_rows > rendered_rows + MAX_SETTLE_GROWTH_ROWS then
 			_baselines[pane_id] = nil
-			wezterm.log_debug(
+			wezterm.log_info(
 				("resurrect.restore_baseline: pane %d grew %d->%d rows during settle (activity), not tracking"):format(
 					pane_id,
 					rendered_rows,
@@ -112,7 +112,7 @@ function pub.register(pane, text)
 			return
 		end
 		entry.snapshot = snapshot
-		wezterm.log_debug(
+		wezterm.log_info(
 			("resurrect.restore_baseline: pane %d settled (%d rows), idle saves will persist the replay"):format(
 				pane_id,
 				snapshot_rows
@@ -137,15 +137,15 @@ function pub.text_to_persist(pane, captured)
 	end
 	local pane_id = pane:pane_id()
 	if not entry.snapshot then
-		wezterm.log_debug(("resurrect.restore_baseline: pane %d saved before settle, capturing live"):format(pane_id))
+		wezterm.log_info(("resurrect.restore_baseline: pane %d saved before settle, capturing live"):format(pane_id))
 		return captured
 	end
 	if captured == entry.snapshot then
-		wezterm.log_debug(("resurrect.restore_baseline: pane %d idle, persisting replay"):format(pane_id))
+		wezterm.log_info(("resurrect.restore_baseline: pane %d idle, persisting replay"):format(pane_id))
 		return entry.text
 	end
 	_baselines[pane_id] = nil
-	wezterm.log_debug(
+	wezterm.log_info(
 		("resurrect.restore_baseline: pane %d changed since restore, capturing live from now on"):format(pane_id)
 	)
 	return captured
