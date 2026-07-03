@@ -174,17 +174,23 @@ function pub.event_driven_save(opts)
 	local last_structure = {}
 
 	local function do_save(window)
-		wezterm.emit("resurrect.state_manager.event_driven_save.start", opts)
+		local ok, err = pcall(function()
+			wezterm.emit("resurrect.state_manager.event_driven_save.start", opts)
 
-		if opts.save_workspaces then
-			save_workspace()
+			if opts.save_workspaces then
+				save_workspace()
+			end
+
+			if opts.save_windows or opts.save_tabs then
+				save_named_windows_and_tabs({ window:mux_window() }, opts)
+			end
+
+			wezterm.emit("resurrect.state_manager.event_driven_save.finished", opts)
+		end)
+		if not ok then
+			wezterm.log_error("resurrect: event_driven_save failed: " .. tostring(err))
+			wezterm.emit("resurrect.error", "event_driven_save failed: " .. tostring(err))
 		end
-
-		if opts.save_windows or opts.save_tabs then
-			save_named_windows_and_tabs({ window:mux_window() }, opts)
-		end
-
-		wezterm.emit("resurrect.state_manager.event_driven_save.finished", opts)
 	end
 
 	-- Save when the pane/tab structure changes (new split, new tab, closed pane).
