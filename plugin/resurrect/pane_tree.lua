@@ -1,4 +1,5 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
+local restore_baseline = require("resurrect.restore_baseline")
 local utils = require("resurrect.utils")
 
 ---@class pane_tree_module
@@ -117,11 +118,13 @@ local function insert_panes(root, panes)
 				process_info.ppid = nil
 				root.process = process_info
 			else
-				local nlines = root.pane:get_dimensions().scrollback_rows
-				if nlines > pub.max_nlines then
-					nlines = pub.max_nlines
-				end
-				root.text = utils.strip_trailing_blank_rows(root.pane:get_lines_as_escapes(nlines))
+				-- A restored pane that is untouched since restore keeps its
+				-- replayed baseline byte-identical; persisting the capture
+				-- would also pick up the fresh prompt the restore triggered
+				-- and grow the saved state by one prompt block per
+				-- save->restore cycle.
+				local captured = utils.capture_pane_text(root.pane, pub.max_nlines)
+				root.text = restore_baseline.text_to_persist(root.pane, captured)
 			end
 		end
 	end

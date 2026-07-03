@@ -84,6 +84,21 @@ function utils.strip_trailing_blank_rows(text)
 	return text
 end
 
+---Capture a pane's scrollback as escape-encoded text, capped at max_nlines
+---rows and stripped of trailing blank rows. Both the save-time capture and
+---restore_baseline's settle snapshot must go through this same path so their
+---outputs are byte-comparable.
+---@param pane Pane
+---@param max_nlines integer
+---@return string
+function utils.capture_pane_text(pane, max_nlines)
+	local nlines = pane:get_dimensions().scrollback_rows
+	if nlines > max_nlines then
+		nlines = max_nlines
+	end
+	return utils.strip_trailing_blank_rows(pane:get_lines_as_escapes(nlines))
+end
+
 -- getting screen dimensions
 ---@return number
 function utils.get_current_window_width()

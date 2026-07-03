@@ -1,6 +1,7 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local pane_tree_mod = require("resurrect.pane_tree")
 local state_manager_mod = require("resurrect.state_manager")
+local restore_baseline = require("resurrect.restore_baseline")
 local utils = require("resurrect.utils")
 local pub = {}
 
@@ -233,7 +234,9 @@ function pub.default_on_pane_restore(pane_tree)
 	elseif pane_tree.text then
 		-- Kept as a defensive pass for state files saved before capture-time
 		-- trimming existed; a no-op for freshly saved state.
-		pane:inject_output(utils.strip_trailing_blank_rows(pane_tree.text))
+		local text = utils.strip_trailing_blank_rows(pane_tree.text)
+		pane:inject_output(text)
+		restore_baseline.register(pane, text)
 		-- Send newline to trigger a fresh shell prompt at the correct position
 		pane:send_text("\r\n")
 	end
