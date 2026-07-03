@@ -572,15 +572,15 @@ Example: sending a toast notification when specified events occur, but suppress 
 ```lua
 local resurrect_event_listeners = {
   "resurrect.error",
-  "resurrect.state_manager.save_state.finished",
+  "resurrect.file_io.write_state.finished",
 }
 local is_periodic_save = false
-wezterm.on("resurrect.periodic_save", function()
+wezterm.on("resurrect.state_manager.periodic_save.start", function()
   is_periodic_save = true
 end)
 for _, event in ipairs(resurrect_event_listeners) do
   wezterm.on(event, function(...)
-    if event == "resurrect.state_manager.save_state.finished" and is_periodic_save then
+    if event == "resurrect.file_io.write_state.finished" and is_periodic_save then
       is_periodic_save = false
       return
     end
