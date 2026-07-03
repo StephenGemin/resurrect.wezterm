@@ -104,12 +104,12 @@ end
 --- @param data string
 --- @return string
 local function sanitize_json(data)
-	wezterm.emit("resurrect.file_io.sanitize_json.start", #data)
+	wezterm.emit("resurrect.file_io.sanitize_json.start", data)
 	-- escapes control characters to ensure valid json
 	data = data:gsub("[\x00-\x1F]", function(c)
 		return string.format("\\u00%02X", string.byte(c))
 	end)
-	wezterm.emit("resurrect.file_io.sanitize_json.finished")
+	wezterm.emit("resurrect.file_io.sanitize_json.finished", data)
 	return data
 end
 
