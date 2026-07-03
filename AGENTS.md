@@ -25,6 +25,8 @@ plugin/
     window_state.lua         get_window_state(), restore_window(), save_window_action()
     tab_state.lua            get_tab_state(), restore_tab(), save_tab_action()
     pane_tree.lua            binary-tree representation of pane splits; fold/map
+    restore_baseline.lua     per-pane replayed-text registry + OSC 133 idle check,
+                             so saves don't re-capture (and grow) idle restored panes
     utils.lua                platform detection, string helpers, ensure_folder_exists
     fuzzy_loader.lua         fuzzy-finder UI for picking a saved state to load
     test/

@@ -23,6 +23,14 @@ describe("tab_state.default_on_pane_restore trailing blank-row stripping", funct
 			injected = text
 		end
 		function pane.send_text(_, _) end
+		-- default_on_pane_restore registers the replayed text with
+		-- restore_baseline, which needs an id and cursor position.
+		function pane.pane_id(_)
+			return 1
+		end
+		function pane.get_cursor_position(_)
+			return { x = 0, y = 0 }
+		end
 		return pane, function()
 			return injected
 		end
