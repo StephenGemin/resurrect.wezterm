@@ -29,8 +29,6 @@ plugin/
                              check, so saves don't re-capture (and grow) idle restored panes
     utils.lua                platform detection, string helpers, ensure_folder_exists
     fuzzy_loader.lua         fuzzy-finder UI for picking a saved state to load
-    test/
-      text.lua               manual test helper — injects chars to exercise encoding
 spec/
   spec_helper.lua            shared wezterm mock and module loader for busted specs
   unit/                      unit tests (busted --run=unit)
