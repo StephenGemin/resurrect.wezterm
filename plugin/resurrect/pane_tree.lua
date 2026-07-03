@@ -68,6 +68,49 @@ local function pop_connected_right(root, panes)
 	end
 end
 
+local NIX_STORE_PREFIX = "/nix/store/"
+local NIX_VIM_EXECUTABLES = { vim = true, nvim = true, gvim = true }
+
+-- NixOS executables live under immutable, hash-suffixed /nix/store paths that
+-- go stale across Nix generations/garbage collection, so replaying the saved
+-- argv verbatim can fail to restore a vim/nvim/gvim pane. Collapse the
+-- executable to its bare command name (resolved via PATH on restore instead)
+-- and drop any --cmd/-c flag whose value is itself a /nix/store path (Neovim
+-- bakes these in for e.g. python3_host_prog).
+---@param process_info local_process_info
+local function sanitize_nix_store_paths(process_info)
+	if not process_info.executable or not process_info.executable:find(NIX_STORE_PREFIX, 1, true) then
+		return
+	end
+	process_info.executable = process_info.name or process_info.executable
+
+	if not process_info.argv then
+		return
+	end
+
+	local is_vim = NIX_VIM_EXECUTABLES[process_info.executable]
+	local argv = { process_info.executable }
+	local pending_flag = nil
+	for i, arg in ipairs(process_info.argv) do
+		if i > 1 then
+			if not is_vim then
+				table.insert(argv, arg)
+			elseif pending_flag then
+				if not arg:find(NIX_STORE_PREFIX, 1, true) then
+					table.insert(argv, pending_flag)
+					table.insert(argv, arg)
+				end
+				pending_flag = nil
+			elseif arg == "--cmd" or arg == "-c" then
+				pending_flag = arg
+			else
+				table.insert(argv, arg)
+			end
+		end
+	end
+	process_info.argv = argv
+end
+
 ---@param root pane_tree | nil
 ---@param panes PaneInformation[]
 ---@return pane_tree | nil
@@ -116,6 +159,7 @@ local function insert_panes(root, panes)
 				process_info.children = nil
 				process_info.pid = nil
 				process_info.ppid = nil
+				sanitize_nix_store_paths(process_info)
 				root.process = process_info
 			else
 				-- A restored pane that is untouched since restore keeps its
