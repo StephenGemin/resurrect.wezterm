@@ -37,8 +37,10 @@ init()
 ---   keybindings        = true   -- add Alt+W/R/Shift+W/Shift+T bindings
 ---   status_bar         = true   -- show save time + tab titles in right status
 ---
+---@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, keybindings: boolean?, status_bar: boolean?}
+
 ---@param config table wezterm config_builder object
----@param opts? table optional overrides
+---@param opts? setup_opts optional overrides
 function pub.setup(config, opts)
 	opts = opts or {}
 	local save_workspaces = opts.save_workspaces ~= false
