@@ -18,7 +18,7 @@ function utils.platform_default_state_dir()
 	elseif utils.is_mac then
 		return home .. "/Library/Application Support/wezterm/resurrect/"
 	else
-		local xdg = os.getenv("XDG_DATA_HOME") or (home .. "/.local/share")
+		local xdg = os.getenv("XDG_STATE_HOME") or (home .. "/.local/state")
 		return xdg .. "/wezterm/resurrect/"
 	end
 end
