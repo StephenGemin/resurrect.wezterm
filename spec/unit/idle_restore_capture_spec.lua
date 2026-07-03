@@ -1,20 +1,21 @@
 -- A restored pane replays its saved scrollback and the restore's "\r\n" makes
 -- the shell print a fresh prompt, so a naive re-capture persists
 -- [replay + fresh prompt] -- one extra prompt block per save->restore cycle,
--- forever. restore_baseline uses OSC 133 semantic zones to break that loop.
--- These specs pin the capture-side contract, whose failure modes are all
--- quiet: idle restored panes persist the replayed text byte-identical
--- (compounding), real activity is always captured live (data loss if not),
--- and panes without OSC 133 marks always capture live (frozen saved state if
--- not).
+-- forever. restore_baseline snapshots the pane once the fresh prompt has
+-- painted and persists the replay byte-identically for as long as captures
+-- still equal that snapshot. These specs pin the capture-side contract, whose
+-- failure modes are all quiet: idle restored panes persist the replayed text
+-- byte-identical (compounding returns if not), any content change is captured
+-- live (data loss if not), and activity during the settle window must not be
+-- frozen into the snapshot (data loss if it is).
 
 local helper = require("spec_helper")
 
 describe("restored-pane idle check (restore_baseline)", function()
-	local tab_state, pane_tree
+	local wz, tab_state, pane_tree
 
 	before_each(function()
-		local wz = helper.new_wezterm()
+		wz = helper.new_wezterm()
 		tab_state = helper.load("resurrect.tab_state", wz)
 		-- Plain require so pane_tree shares tab_state's restore_baseline
 		-- instance; a second helper.load would reset package.loaded and give
@@ -23,17 +24,12 @@ describe("restored-pane idle check (restore_baseline)", function()
 	end)
 
 	local BASELINE = "old output\r\nprompt>"
-	local LIVE_CAPTURE = "old output\r\nprompt>\r\nfresh prompt>"
+	local SETTLED = BASELINE .. "\r\n\r\nfresh prompt>"
 
-	-- BASELINE has one newline and the cursor sits at row 1 after inject, so
-	-- rows 0-1 are the replay; zones from row 2 down are post-restore.
-	local function make_pane(zones)
-		local pane = {}
+	local function make_pane()
+		local pane = { content = BASELINE }
 		function pane.pane_id(_)
 			return 7
-		end
-		function pane.get_cursor_position(_)
-			return { x = 0, y = 1 }
 		end
 		function pane.inject_output(_, _) end
 		function pane.send_text(_, _) end
@@ -50,12 +46,23 @@ describe("restored-pane idle check (restore_baseline)", function()
 			return { scrollback_rows = 100 }
 		end
 		function pane.get_lines_as_escapes(_, _)
-			return LIVE_CAPTURE
-		end
-		function pane.get_semantic_zones(_, zone_type)
-			return zones[zone_type] or {}
+			return pane.content
 		end
 		return pane
+	end
+
+	-- Run the settle snapshot scheduled by register(); the harness records
+	-- call_after callbacks instead of executing them on a timer.
+	local function settle()
+		for _, call in ipairs(wz._rec.calls) do
+			if call.name == "call_after" then
+				call.fn()
+			end
+		end
+	end
+
+	local function restore(pane)
+		tab_state.default_on_pane_restore({ pane = pane, text = BASELINE })
 	end
 
 	local function capture(pane)
@@ -65,36 +72,45 @@ describe("restored-pane idle check (restore_baseline)", function()
 		return tree.text
 	end
 
-	it("persists the replayed text unchanged for an idle pane with OSC 133 marks", function()
-		local pane = make_pane({
-			-- An Output zone inside the replayed rows (an old command) plus the
-			-- live fresh prompt below; nothing has run since the restore.
-			Output = { { start_y = 0 } },
-			Prompt = { { start_y = 2 } },
-		})
-		tab_state.default_on_pane_restore({ pane = pane, text = BASELINE })
+	it("persists the replayed text unchanged for an idle pane", function()
+		local pane = make_pane()
+		restore(pane)
+		pane.content = SETTLED
+		settle()
 		assert.are.equal(BASELINE, capture(pane))
 	end)
 
 	it("keeps the idle verdict across repeated saves, not just the first", function()
-		local pane = make_pane({ Prompt = { { start_y = 2 } } })
-		tab_state.default_on_pane_restore({ pane = pane, text = BASELINE })
+		local pane = make_pane()
+		restore(pane)
+		pane.content = SETTLED
+		settle()
 		assert.are.equal(BASELINE, capture(pane))
 		assert.are.equal(BASELINE, capture(pane))
 	end)
 
-	it("captures live once a command has produced output below the replay", function()
-		local pane = make_pane({
-			Output = { { start_y = 2 } },
-			Prompt = { { start_y = 3 } },
-		})
-		tab_state.default_on_pane_restore({ pane = pane, text = BASELINE })
-		assert.are.equal(LIVE_CAPTURE, capture(pane))
+	it("captures live once the pane's content changes after settle", function()
+		local pane = make_pane()
+		restore(pane)
+		pane.content = SETTLED
+		settle()
+		pane.content = SETTLED .. "\r\nhello"
+		assert.are.equal(SETTLED .. "\r\nhello", capture(pane))
 	end)
 
-	it("captures live when the pane has no OSC 133 zones at all", function()
-		local pane = make_pane({})
-		tab_state.default_on_pane_restore({ pane = pane, text = BASELINE })
-		assert.are.equal(LIVE_CAPTURE, capture(pane))
+	it("captures live when saving before the settle snapshot exists", function()
+		local pane = make_pane()
+		restore(pane)
+		pane.content = SETTLED
+		assert.are.equal(SETTLED, capture(pane))
+	end)
+
+	it("does not freeze activity that happened during the settle window", function()
+		local pane = make_pane()
+		restore(pane)
+		local burst = BASELINE .. string.rep("\r\nout", 12)
+		pane.content = burst
+		settle()
+		assert.are.equal(burst, capture(pane))
 	end)
 end)
