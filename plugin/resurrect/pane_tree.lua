@@ -71,14 +71,18 @@ end
 local NIX_STORE_PREFIX = "/nix/store/"
 local NIX_VIM_EXECUTABLES = { vim = true, nvim = true, gvim = true }
 
--- NixOS executables live under immutable, hash-suffixed /nix/store paths that
--- go stale across Nix generations/garbage collection, so replaying the saved
--- argv verbatim can fail to restore a vim/nvim/gvim pane. Collapse the
--- executable to its bare command name (resolved via PATH on restore instead)
--- and drop any --cmd/-c flag whose value is itself a /nix/store path (Neovim
--- bakes these in for e.g. python3_host_prog).
+-- Nix/NixOS installs executables under immutable, hash-suffixed store paths
+-- (e.g. /nix/store/<hash>-neovim-unwrapped-.../bin/nvim) that go stale across
+-- Nix generations or a garbage collection, so replaying a saved argv verbatim
+-- can fail to restore a vim/nvim/gvim pane. There's no OS-level flag for
+-- "this is Nix" the way utils.is_windows exists for Windows -- the
+-- NIX_STORE_PREFIX check below is the only signal, and it makes this a no-op
+-- on every platform that isn't Nix. Collapse the executable to its bare
+-- command name (resolved via PATH on restore instead) and drop any --cmd/-c
+-- flag whose value is itself a /nix/store path (Neovim bakes these in for
+-- e.g. python3_host_prog).
 ---@param process_info local_process_info
-local function sanitize_nix_store_paths(process_info)
+local function sanitize_immutable_store_paths(process_info)
 	if not process_info.executable or not process_info.executable:find(NIX_STORE_PREFIX, 1, true) then
 		return
 	end
@@ -159,7 +163,7 @@ local function insert_panes(root, panes)
 				process_info.children = nil
 				process_info.pid = nil
 				process_info.ppid = nil
-				sanitize_nix_store_paths(process_info)
+				sanitize_immutable_store_paths(process_info)
 				root.process = process_info
 			else
 				-- A restored pane that is untouched since restore keeps its
