@@ -71,6 +71,15 @@ function utils.strip_trailing_blank_rows(text)
 			text = without_osc_st
 			stripped = true
 		end
+		-- Escape sequences with intermediate bytes (0x20-0x2F) and a final byte,
+		-- e.g. the ESC ( B charset designation that get_lines_as_escapes emits at
+		-- the start of every row; a trailing one otherwise blocks the strip loop
+		-- just like an unrecognized CSI/OSC would.
+		local without_esc, esc_count = text:gsub(ESC .. "[ -/]+[0-~]$", "")
+		if esc_count > 0 then
+			text = without_esc
+			stripped = true
+		end
 	end
 	return text
 end
