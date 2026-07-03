@@ -28,19 +28,38 @@ local function get_file_path(file_name, type, opt_name)
 	)
 end
 
+-- Roll the previous save at file_path to file_path.bak before it's overwritten,
+-- so a degraded save (e.g. a partial restore saved back over a good snapshot)
+-- doesn't permanently destroy the last known-good copy. write_state's atomic
+-- temp-file+rename already protects against a torn write; this protects
+-- against a successful-but-worse write.
+---@param file_path string
+local function rotate_backup(file_path)
+	if not file_io.file_exists(file_path) then
+		return
+	end
+	file_io.move_file(file_path, file_path .. ".bak")
+end
+
 ---save state to a file
 ---@param state workspace_state | window_state | tab_state
 ---@param opt_name? string
 function pub.save_state(state, opt_name)
 	if state.window_states then
 		utils.ensure_folder_exists(_save_state_dir .. "workspace")
-		file_io.write_state(get_file_path(state.workspace, "workspace", opt_name), state, "workspace")
+		local fp = get_file_path(state.workspace, "workspace", opt_name)
+		rotate_backup(fp)
+		file_io.write_state(fp, state, "workspace")
 	elseif state.tabs then
 		utils.ensure_folder_exists(_save_state_dir .. "window")
-		file_io.write_state(get_file_path(state.title, "window", opt_name), state, "window")
+		local fp = get_file_path(state.title, "window", opt_name)
+		rotate_backup(fp)
+		file_io.write_state(fp, state, "window")
 	elseif state.pane_tree then
 		utils.ensure_folder_exists(_save_state_dir .. "tab")
-		file_io.write_state(get_file_path(state.title, "tab", opt_name), state, "tab")
+		local fp = get_file_path(state.title, "tab", opt_name)
+		rotate_backup(fp)
+		file_io.write_state(fp, state, "tab")
 	end
 end
 
