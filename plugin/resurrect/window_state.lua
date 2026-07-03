@@ -51,40 +51,52 @@ function pub.restore_window(window, window_state, opts)
 		opts = {}
 	end
 
-	if window_state.title then
-		window:set_title(window_state.title)
-	end
+	-- Wrapped in pcall so a thrown error partway through (bad spawn args, a
+	-- malformed saved tab state, etc.) surfaces as resurrect.error instead of
+	-- aborting silently with .start fired and no .finished or error signal.
+	local ok, err = pcall(function()
+		if window_state.title then
+			window:set_title(window_state.title)
+		end
 
-	local active_tab
-	for i, tab_state in ipairs(window_state.tabs) do
-		local tab
-		if i == 1 and opts.tab then
-			tab = opts.tab
-		else
-			local spawn_tab_args = { cwd = tab_state.pane_tree.cwd }
-			if tab_state.pane_tree.domain then
-				spawn_tab_args.domain = { DomainName = tab_state.pane_tree.domain }
+		local active_tab
+		for i, tab_state in ipairs(window_state.tabs) do
+			local tab
+			if i == 1 and opts.tab then
+				tab = opts.tab
+			else
+				local spawn_tab_args = { cwd = tab_state.pane_tree.cwd }
+				if tab_state.pane_tree.domain then
+					spawn_tab_args.domain = { DomainName = tab_state.pane_tree.domain }
+				end
+				tab, opts.pane = window:spawn_tab(spawn_tab_args)
 			end
-			tab, opts.pane = window:spawn_tab(spawn_tab_args)
+
+			if i == 1 and opts.close_open_tabs then
+				close_all_other_tabs(window, tab)
+			end
+
+			tab_state_mod.restore_tab(tab, tab_state, opts)
+			if tab_state.is_active then
+				active_tab = tab
+			end
+
+			if tab_state.is_zoomed then
+				tab:set_zoomed(true)
+			end
 		end
 
-		if i == 1 and opts.close_open_tabs then
-			close_all_other_tabs(window, tab)
+		if active_tab then
+			active_tab:activate()
 		end
+	end)
 
-		tab_state_mod.restore_tab(tab, tab_state, opts)
-		if tab_state.is_active then
-			active_tab = tab
-		end
-
-		if tab_state.is_zoomed then
-			tab:set_zoomed(true)
-		end
+	if not ok then
+		wezterm.log_error("resurrect: restore_window failed: " .. tostring(err))
+		wezterm.emit("resurrect.error", "restore_window failed: " .. tostring(err))
+		return
 	end
 
-	if active_tab then
-		active_tab:activate()
-	end
 	wezterm.emit("resurrect.window_state.restore_window.finished")
 end
 
