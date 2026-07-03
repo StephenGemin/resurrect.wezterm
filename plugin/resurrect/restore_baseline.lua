@@ -94,7 +94,9 @@ function pub.register(pane, text)
 		local snap_ok, snapshot = pcall(utils.capture_pane_text, pane, max_nlines)
 		if not snap_ok then
 			_baselines[pane_id] = nil
-			wezterm.log_info(("resurrect.restore_baseline: pane %d settle capture failed, not tracking"):format(pane_id))
+			wezterm.log_info(
+				("resurrect.restore_baseline: pane %d settle capture failed, not tracking"):format(pane_id)
+			)
 			return
 		end
 		local snapshot_rows = count_rows(snapshot)
