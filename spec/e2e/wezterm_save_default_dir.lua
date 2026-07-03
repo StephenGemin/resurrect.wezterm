@@ -32,7 +32,7 @@ local function expected_default_dir()
 	elseif is_mac then
 		return wezterm.home_dir .. "/Library/Application Support/wezterm/resurrect/"
 	else
-		local xdg = os.getenv("XDG_DATA_HOME") or (wezterm.home_dir .. "/.local/share")
+		local xdg = os.getenv("XDG_STATE_HOME") or (wezterm.home_dir .. "/.local/state")
 		return xdg .. "/wezterm/resurrect/"
 	end
 end
