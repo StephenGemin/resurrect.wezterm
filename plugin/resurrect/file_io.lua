@@ -37,6 +37,37 @@ function pub.write_file(file_path, str)
 	return suc, err
 end
 
+-- Check whether a file exists and is readable.
+---@param file_path string
+---@return boolean
+function pub.file_exists(file_path)
+	local handle = io.open(file_path, "rb")
+	if handle then
+		handle:close()
+		return true
+	end
+	return false
+end
+
+-- Move a file. Works on Windows, where os.rename fails if the destination
+-- already exists (POSIX silently overwrites). Falls back to remove-then-rename.
+---@param src string
+---@param dst string
+---@return boolean success
+---@return string|nil error
+function pub.move_file(src, dst)
+	local ok = os.rename(src, dst)
+	if ok then
+		return true, nil
+	end
+	os.remove(dst)
+	local ok2, err = os.rename(src, dst)
+	if not ok2 then
+		return false, err
+	end
+	return true, nil
+end
+
 -- Read a file and return its content
 ---@param file_path string full filename
 ---@return boolean success result
