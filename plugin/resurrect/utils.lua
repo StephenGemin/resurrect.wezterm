@@ -7,7 +7,7 @@ utils.is_mac = wezterm.target_triple:find("darwin")
 utils.separator = utils.is_windows and "\\" or "/"
 
 ---Returns the platform-appropriate directory for persisting resurrect.wezterm state.
----Respects XDG_DATA_HOME on Linux; uses Application Support on macOS;
+---Respects XDG_STATE_HOME on Linux; uses Application Support on macOS;
 ---uses %APPDATA% on Windows. Always ends with the platform path separator.
 ---@return string
 function utils.platform_default_state_dir()

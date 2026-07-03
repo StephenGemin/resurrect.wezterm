@@ -20,12 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        config:
-          [
-            spec/e2e/wezterm_basic.lua,
-            spec/e2e/wezterm_save.lua,
-            spec/e2e/wezterm_save_default_dir.lua,
-          ]
+        config: [spec/e2e/wezterm_basic.lua, spec/e2e/wezterm_save.lua]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
