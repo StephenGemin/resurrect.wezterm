@@ -18,12 +18,9 @@ if command -v cygpath >/dev/null 2>&1; then
 	RESURRECT_REPO_PATH=$(cygpath -w "$(pwd)")
 	export RESURRECT_SENTINEL
 	RESURRECT_SENTINEL=$(cygpath -w "$SENTINEL_UNIX")
-	export RESURRECT_SAVE_DIR
-	RESURRECT_SAVE_DIR=$(cygpath -w "$SAVE_DIR_UNIX")
 else
 	export RESURRECT_REPO_PATH="$(pwd)"
 	export RESURRECT_SENTINEL="$SENTINEL_UNIX"
-	export RESURRECT_SAVE_DIR="$SAVE_DIR_UNIX"
 fi
 
 wezterm --config-file "$CONFIG" start &
