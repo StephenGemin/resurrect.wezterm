@@ -548,8 +548,8 @@ This plugin emits the following events that you can use for your own callback fu
 - `resurrect.file_io.decrypt.start(file_path)`
 - `resurrect.file_io.encrypt.finished(file_path)`
 - `resurrect.file_io.encrypt.start(file_path)`
-- `resurrect.file_io.sanitize_json.finished(data)`
-- `resurrect.file_io.sanitize_json.start(data)`
+- `resurrect.file_io.sanitize_json.finished()`
+- `resurrect.file_io.sanitize_json.start(data_length)`
 - `resurrect.fuzzy_loader.fuzzy_load.finished(window, pane)`
 - `resurrect.fuzzy_loader.fuzzy_load.start(window, pane)`
 - `resurrect.state_manager.delete_state.finished(file_path)`
