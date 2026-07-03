@@ -8,6 +8,7 @@ end
 -- assertions below depend on. Each arg is quoted so paths with spaces survive.
 local wezterm_stub = {
   target_triple = is_windows() and "x86_64-pc-windows-msvc" or "x86_64-unknown-linux-gnu",
+  log_info = function() end,
   run_child_process = function(argv)
     local parts = {}
     for _, a in ipairs(argv) do

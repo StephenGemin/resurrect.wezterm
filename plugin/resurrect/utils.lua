@@ -223,7 +223,19 @@ function utils.ensure_folder_exists(path)
 	if dir_is_accessible(path) then
 		return true
 	end
-	if shell_mkdir(path) then
+	-- Logged because this is the call that can flash a console window on
+	-- Windows/WSL; if a future report says it fires every launch instead of
+	-- once, this line (grep the wezterm log for "resurrect.utils") is the
+	-- fastest way to confirm it and see which path is involved.
+	local created = shell_mkdir(path)
+	wezterm.log_info(
+		("resurrect.utils: ensure_folder_exists creating %s (platform=%s) -> %s"):format(
+			path,
+			utils.is_windows and "windows" or "unix",
+			created and "ok" or "failed"
+		)
+	)
+	if created then
 		-- Post-verify: confirm the directory is actually usable after creation.
 		return dir_is_accessible(path)
 	end
