@@ -34,7 +34,6 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
     - [Change the directory to store the saved state](#change-the-directory-to-store-the-saved-state)
     - [Events](#events)
   - [State files](#state-files)
-  - [Augmenting the command palette](#augmenting-the-command-palette)
   - [FAQ](#faq)
     - [Pane CWD is not correct on Windows](#pane-cwd-is-not-correct-on-windows)
     - [How do I keep my plugins up to date?](#how-do-i-keep-my-plugins-up-to-date)
@@ -626,7 +625,7 @@ Here is an example of a json file:
                   "pixel_height":1000,
                   "pixel_width":1910,
                   "process":"/bin/bash", -- value is empty if attached to a remote domain
-                  "text":"Some text", -- not saved if attached to a remote domain, see https://github.com/StephenGemin/resurrect.wezterm/issues/41
+                  "text":"Some text", -- not saved if attached to a remote domain, see https://github.com/MLFlexer/resurrect.wezterm/issues/41
                   "top":0,
                   "width":191
                },
@@ -638,38 +637,6 @@ Here is an example of a json file:
    ],
    "workspace":"workspace_name"
 }
-```
-
-## Augmenting the command palette
-
-If you would like to add entries in your Wezterm command palette for renaming and switching workspaces:
-
-```lua
-local workspace_switcher = wezterm.plugin.require("https://github.com/StephenGemin/smart_workspace_switcher.wezterm")
-
-wezterm.on("augment-command-palette", function(window, pane)
-  local workspace_state = resurrect.workspace_state
-  return {
-    {
-      brief = "Window | Workspace: Switch Workspace",
-      icon = "md_briefcase_arrow_up_down",
-      action = workspace_switcher.switch_workspace(),
-    },
-    {
-      brief = "Window | Workspace: Rename Workspace",
-      icon = "md_briefcase_edit",
-      action = wezterm.action.PromptInputLine({
-        description = "Enter new name for workspace",
-        action = wezterm.action_callback(function(window, pane, line)
-          if line then
-            wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), line)
-            resurrect.state_manager.save_state(workspace_state.get_workspace_state())
-          end
-        end),
-      }),
-    },
-  }
-end)
 ```
 
 ## FAQ
