@@ -92,7 +92,9 @@ local function find_json_files_recursive(base_path)
 	if success then
 		return stdout
 	else
-		wezterm.emit("resurrect.error", stderr or "Failed to list state files")
+		local msg = stderr or "Failed to list state files"
+		wezterm.log_error("resurrect: " .. msg)
+		wezterm.emit("resurrect.error", msg)
 		return nil
 	end
 end
@@ -382,6 +384,7 @@ function pub.fuzzy_load(window, pane, callback, opts)
 	local state_files = insert_choices(stdout, opts)
 
 	if #state_files == 0 then
+		wezterm.log_error("resurrect: No existing state files to select")
 		wezterm.emit("resurrect.error", "No existing state files to select")
 	end
 
