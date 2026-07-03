@@ -121,7 +121,7 @@ local function insert_panes(root, panes)
 				if nlines > pub.max_nlines then
 					nlines = pub.max_nlines
 				end
-				root.text = root.pane:get_lines_as_escapes(nlines)
+				root.text = utils.strip_trailing_blank_rows(root.pane:get_lines_as_escapes(nlines))
 			end
 		end
 	end

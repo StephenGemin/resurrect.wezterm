@@ -67,6 +67,17 @@ describe("tab_state.default_on_pane_restore trailing blank-row stripping", funct
 		assert.are.equal("real content", get_injected())
 	end)
 
+	it("strips trailing blank rows ending in a charset-designation escape", function()
+		local pane, get_injected = make_pane()
+		-- Mirrors a real fresh-workspace capture: get_lines_as_escapes emits an
+		-- ESC ( B charset designation at the start of every row, so a capture
+		-- ending mid-blank-row leaves one as the final token, which the
+		-- whitespace/CSI/OSC passes alone couldn't get past.
+		local text = "real content\27[39m\r\n\r\n\r\n\r\n\27(B"
+		tab_state.default_on_pane_restore({ pane = pane, text = text })
+		assert.are.equal("real content", get_injected())
+	end)
+
 	it("leaves text with no trailing blank rows unchanged", function()
 		local pane, get_injected = make_pane()
 		local text = "real content"

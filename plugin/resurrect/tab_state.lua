@@ -1,6 +1,7 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local pane_tree_mod = require("resurrect.pane_tree")
 local state_manager_mod = require("resurrect.state_manager")
+local utils = require("resurrect.utils")
 local pub = {}
 
 local _named_tabs = {} -- {[tab_id: integer] = name: string}
@@ -83,48 +84,6 @@ function pub.get_tab_state(tab)
 	}
 
 	return tab_state
-end
-
--- Trailing blank rows in captured scrollback often end in a color/SGR escape
--- sequence (e.g. a trailing reset) even though the row itself renders empty,
--- so a plain trailing-whitespace strip leaves them in place. Shell integration
--- (OSC 133/OSC 7) can also leave an OSC sequence trailing the last row; an
--- unrecognized trailing token of either kind blocks the strip loop and leaves
--- every blank row above it in place. Strip whitespace, CSI, and OSC sequences
--- alternately from the end until nothing matches, so idle rows on screen at
--- save time don't get replayed -- and re-saved -- on every subsequent restore.
-local ESC = string.char(27)
-local BEL = string.char(7)
-local function strip_trailing_blank_rows(text)
-	local stripped = true
-	while stripped do
-		stripped = false
-		local without_ws, ws_count = text:gsub("%s+$", "")
-		if ws_count > 0 then
-			text = without_ws
-			stripped = true
-		end
-		-- Final byte is any of "@"-"~" (0x40-0x7E) per the CSI grammar, not just
-		-- letters -- e.g. private-mode sequences end in "h"/"l", SGR ends in "m".
-		local without_csi, csi_count = text:gsub(ESC .. "%[[^@-~]*[@-~]$", "")
-		if csi_count > 0 then
-			text = without_csi
-			stripped = true
-		end
-		-- OSC has two legal terminators (BEL, or ST = ESC "\\"); both occur in
-		-- the wild, so both passes are needed.
-		local without_osc_bel, osc_bel_count = text:gsub(ESC .. "%][^" .. BEL .. "]*" .. BEL .. "$", "")
-		if osc_bel_count > 0 then
-			text = without_osc_bel
-			stripped = true
-		end
-		local without_osc_st, osc_st_count = text:gsub(ESC .. "%][^" .. ESC .. "]*" .. ESC .. "\\$", "")
-		if osc_st_count > 0 then
-			text = without_osc_st
-			stripped = true
-		end
-	end
-	return text
 end
 
 ---Force closes all other tabs in the window but one
@@ -272,7 +231,9 @@ function pub.default_on_pane_restore(pane_tree)
 			)
 		end
 	elseif pane_tree.text then
-		pane:inject_output(strip_trailing_blank_rows(pane_tree.text))
+		-- Kept as a defensive pass for state files saved before capture-time
+		-- trimming existed; a no-op for freshly saved state.
+		pane:inject_output(utils.strip_trailing_blank_rows(pane_tree.text))
 		-- Send newline to trigger a fresh shell prompt at the correct position
 		pane:send_text("\r\n")
 	end
