@@ -60,9 +60,9 @@ function pub.restore_workspace(workspace_state, opts)
 	-- the loop above never spawned or reused a window for this workspace. Switching
 	-- into it below would then crash with "<name> is not an existing workspace".
 	if opts.window == nil then
-		wezterm.log_warn(
-			"resurrect: workspace '" .. tostring(workspace_state.workspace) .. "' has no windows to restore; skipping"
-		)
+		local msg = "workspace '" .. tostring(workspace_state.workspace) .. "' has no windows to restore; skipping"
+		wezterm.log_warn("resurrect: " .. msg)
+		wezterm.emit("resurrect.error", msg)
 		return
 	end
 
