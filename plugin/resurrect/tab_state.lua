@@ -105,41 +105,54 @@ end
 ---@param opts restore_opts
 function pub.restore_tab(tab, tab_state, opts)
 	wezterm.emit("resurrect.tab_state.restore_tab.start")
-	if opts.pane then
-		tab_state.pane_tree.pane = opts.pane
-		-- Only needed when genuinely reusing an already-running pane (see
-		-- workspace_state.restore_workspace's active-pane reuse case). Panes spawned
-		-- fresh already have the right cwd from their spawn args; sending `cd` there
-		-- is a redundant command that ends up baked into scrollback and gets
-		-- replayed + re-saved on every future restore.
-		if opts.pane_needs_cd and tab_state.pane_tree.cwd and tab_state.pane_tree.cwd ~= "" then
-			opts.pane:send_text("cd " .. wezterm.shell_join_args({ tab_state.pane_tree.cwd }) .. "\r\n")
+
+	-- Wrapped in pcall so a thrown error partway through (bad split args, a
+	-- malformed saved pane_tree, etc.) surfaces as resurrect.error instead of
+	-- aborting silently with .start fired and no .finished or error signal.
+	local ok, err = pcall(function()
+		if opts.pane then
+			tab_state.pane_tree.pane = opts.pane
+			-- Only needed when genuinely reusing an already-running pane (see
+			-- workspace_state.restore_workspace's active-pane reuse case). Panes spawned
+			-- fresh already have the right cwd from their spawn args; sending `cd` there
+			-- is a redundant command that ends up baked into scrollback and gets
+			-- replayed + re-saved on every future restore.
+			if opts.pane_needs_cd and tab_state.pane_tree.cwd and tab_state.pane_tree.cwd ~= "" then
+				opts.pane:send_text("cd " .. wezterm.shell_join_args({ tab_state.pane_tree.cwd }) .. "\r\n")
+			end
+			opts.pane_needs_cd = nil
+		else
+			local split_args = { cwd = tab_state.pane_tree.cwd }
+			if tab_state.pane_tree.domain then
+				split_args.domain = { DomainName = tab_state.pane_tree.domain }
+			end
+			local new_pane = tab:active_pane():split(split_args)
+			tab_state.pane_tree.pane = new_pane
 		end
-		opts.pane_needs_cd = nil
-	else
-		local split_args = { cwd = tab_state.pane_tree.cwd }
-		if tab_state.pane_tree.domain then
-			split_args.domain = { DomainName = tab_state.pane_tree.domain }
+
+		if opts.close_open_panes then
+			close_all_other_panes(tab, tab_state.pane_tree.pane)
 		end
-		local new_pane = tab:active_pane():split(split_args)
-		tab_state.pane_tree.pane = new_pane
+
+		if tab_state.title then
+			tab:set_title(tab_state.title)
+		end
+
+		local acc = pane_tree_mod.fold(tab_state.pane_tree, { is_zoomed = false }, make_splits(opts))
+		-- acc.active_pane is only set if some node in the saved tree has is_active
+		-- true; a malformed or hand-edited state file can omit that, which would
+		-- otherwise crash the whole restore here.
+		if acc.active_pane then
+			acc.active_pane:activate()
+		end
+	end)
+
+	if not ok then
+		wezterm.log_error("resurrect: restore_tab failed: " .. tostring(err))
+		wezterm.emit("resurrect.error", "restore_tab failed: " .. tostring(err))
+		return
 	end
 
-	if opts.close_open_panes then
-		close_all_other_panes(tab, tab_state.pane_tree.pane)
-	end
-
-	if tab_state.title then
-		tab:set_title(tab_state.title)
-	end
-
-	local acc = pane_tree_mod.fold(tab_state.pane_tree, { is_zoomed = false }, make_splits(opts))
-	-- acc.active_pane is only set if some node in the saved tree has is_active
-	-- true; a malformed or hand-edited state file can omit that, which would
-	-- otherwise crash the whole restore here.
-	if acc.active_pane then
-		acc.active_pane:activate()
-	end
 	wezterm.emit("resurrect.tab_state.restore_tab.finished")
 end
 

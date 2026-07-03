@@ -17,73 +17,92 @@ function pub.restore_workspace(workspace_state, opts)
 		opts = {}
 	end
 
-	-- Default to restoring the windows into (and switching to) the saved
-	-- workspace. Pass `spawn_in_workspace = false` to keep the legacy behaviour of
-	-- spawning them into the "default" workspace without switching.
-	if opts.spawn_in_workspace == nil then
-		opts.spawn_in_workspace = true
-	end
-
-	for i, window_state in ipairs(workspace_state.window_states) do
-		if i == 1 and opts.window then
-			-- inner size is in pixels
-			if opts.resize_window == true or opts.resize_window == nil then
-				opts.window:gui_window():set_inner_size(window_state.size.pixel_width, window_state.size.pixel_height)
-			end
-			if not opts.close_open_tabs then
-				opts.tab = opts.window:active_tab()
-				if not opts.close_open_panes then
-					opts.pane = opts.window:active_pane()
-					-- Flagged explicitly rather than inferred at restore time by comparing
-					-- cwds: get_current_working_dir() isn't reliably populated immediately
-					-- after a fresh spawn, so a runtime comparison would race for the
-					-- common case.
-					opts.pane_needs_cd = true
-				end
-			end
-		else
-			local spawn_window_args = {
-				width = window_state.size.cols,
-				height = window_state.size.rows,
-				cwd = window_state.tabs[1].pane_tree.cwd,
-			}
-			if opts.spawn_in_workspace then
-				spawn_window_args.workspace = workspace_state.workspace
-			end
-			opts.tab, opts.pane, opts.window = wezterm.mux.spawn_window(spawn_window_args)
+	-- Wrapped in pcall so a thrown error partway through (bad spawn args, a
+	-- malformed saved pane_tree, etc.) surfaces as resurrect.error instead of
+	-- aborting silently with .start fired and no .finished or error signal.
+	local ok, result = pcall(function()
+		-- Default to restoring the windows into (and switching to) the saved
+		-- workspace. Pass `spawn_in_workspace = false` to keep the legacy behaviour of
+		-- spawning them into the "default" workspace without switching.
+		if opts.spawn_in_workspace == nil then
+			opts.spawn_in_workspace = true
 		end
 
-		window_state_mod.restore_window(opts.window, window_state, opts)
-	end
+		for i, window_state in ipairs(workspace_state.window_states) do
+			if i == 1 and opts.window then
+				-- inner size is in pixels
+				if opts.resize_window == true or opts.resize_window == nil then
+					opts.window
+						:gui_window()
+						:set_inner_size(window_state.size.pixel_width, window_state.size.pixel_height)
+				end
+				if not opts.close_open_tabs then
+					opts.tab = opts.window:active_tab()
+					if not opts.close_open_panes then
+						opts.pane = opts.window:active_pane()
+						-- Flagged explicitly rather than inferred at restore time by comparing
+						-- cwds: get_current_working_dir() isn't reliably populated immediately
+						-- after a fresh spawn, so a runtime comparison would race for the
+						-- common case.
+						opts.pane_needs_cd = true
+					end
+				end
+			else
+				local spawn_window_args = {
+					width = window_state.size.cols,
+					height = window_state.size.rows,
+					cwd = window_state.tabs[1].pane_tree.cwd,
+				}
+				if opts.spawn_in_workspace then
+					spawn_window_args.workspace = workspace_state.workspace
+				end
+				opts.tab, opts.pane, opts.window = wezterm.mux.spawn_window(spawn_window_args)
+			end
 
-	-- window_states can be saved empty (e.g. a save-time mux race), in which case
-	-- the loop above never spawned or reused a window for this workspace. Switching
-	-- into it below would then crash with "<name> is not an existing workspace".
-	if opts.window == nil then
-		local msg = "workspace '" .. tostring(workspace_state.workspace) .. "' has no windows to restore; skipping"
-		wezterm.log_warn("resurrect: " .. msg)
-		wezterm.emit("resurrect.error", msg)
+			window_state_mod.restore_window(opts.window, window_state, opts)
+		end
+
+		-- window_states can be saved empty (e.g. a save-time mux race), in which case
+		-- the loop above never spawned or reused a window for this workspace. Switching
+		-- into it below would then crash with "<name> is not an existing workspace".
+		if opts.window == nil then
+			local msg = "workspace '" .. tostring(workspace_state.workspace) .. "' has no windows to restore; skipping"
+			wezterm.log_warn("resurrect: " .. msg)
+			wezterm.emit("resurrect.error", msg)
+			return false -- signal: skip .finished below, this isn't an error
+		end
+
+		-- Switch the active workspace to the one just restored, so the user actually
+		-- lands in it rather than staying in (or being dropped into) another workspace.
+		-- Backwards compatible: when `switch_workspace` is unset we fall back to the
+		-- value of `spawn_in_workspace`, preserving the previous behaviour for callers
+		-- that did neither. Pass `switch_workspace = false` to opt out explicitly.
+		local should_switch = opts.switch_workspace
+		if should_switch == nil then
+			should_switch = opts.spawn_in_workspace
+		end
+		if workspace_state.workspace and workspace_state.workspace ~= "" then
+			if should_switch then
+				wezterm.mux.set_active_workspace(workspace_state.workspace)
+			else
+				-- Not switching (legacy `spawn_in_workspace = false`): keep the user in
+				-- their current workspace but rename it to the restored name, so it no
+				-- longer shows up as "default".
+				wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), workspace_state.workspace)
+			end
+		end
+
+		return true
+	end)
+
+	if not ok then
+		wezterm.log_error("resurrect: restore_workspace failed: " .. tostring(result))
+		wezterm.emit("resurrect.error", "restore_workspace failed: " .. tostring(result))
 		return
 	end
 
-	-- Switch the active workspace to the one just restored, so the user actually
-	-- lands in it rather than staying in (or being dropped into) another workspace.
-	-- Backwards compatible: when `switch_workspace` is unset we fall back to the
-	-- value of `spawn_in_workspace`, preserving the previous behaviour for callers
-	-- that did neither. Pass `switch_workspace = false` to opt out explicitly.
-	local should_switch = opts.switch_workspace
-	if should_switch == nil then
-		should_switch = opts.spawn_in_workspace
-	end
-	if workspace_state.workspace and workspace_state.workspace ~= "" then
-		if should_switch then
-			wezterm.mux.set_active_workspace(workspace_state.workspace)
-		else
-			-- Not switching (legacy `spawn_in_workspace = false`): keep the user in
-			-- their current workspace but rename it to the restored name, so it no
-			-- longer shows up as "default".
-			wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), workspace_state.workspace)
-		end
+	if result == false then
+		return
 	end
 
 	wezterm.emit("resurrect.workspace_state.restore_workspace.finished")
