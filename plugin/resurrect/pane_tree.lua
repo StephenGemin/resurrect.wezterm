@@ -136,7 +136,8 @@ end
 -- is_alt_screen_active() can still read true while get_foreground_process_info()
 -- has already moved on to the shell that regained the pty. Falling through to
 -- text capture instead of persisting "restore the shell" is always safe here.
-local COMMON_SHELLS = { bash = true, zsh = true, sh = true, dash = true, fish = true, ksh = true, tcsh = true, csh = true }
+local COMMON_SHELLS =
+	{ bash = true, zsh = true, sh = true, dash = true, fish = true, ksh = true, tcsh = true, csh = true }
 
 ---@param root pane_tree | nil
 ---@param panes PaneInformation[]
