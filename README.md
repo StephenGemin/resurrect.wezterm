@@ -260,7 +260,7 @@ Tab restores always add to the current window, since a tab can't exist outside o
 action = resurrect.fuzzy_loader.restore_action({
   relative        = true,
   restore_text    = true,
-  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
   -- fuzzy_load_opts = { show_state_with_date = true },
 })
 ```
@@ -281,7 +281,7 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
   tab: MuxTab?,                 -- Restore in this tab
   window: MuxWindow,            -- Restore in this window
   resize_window: boolean?,      -- Resizes the window, default: true
-  on_pane_restore: fun(pane_tree: pane_tree), -- Function to restore panes; use resurrect.tab_state.default_on_pane_restore
+  on_pane_restore: fun(pane_tree: pane_tree), -- Function to restore panes; use resurrect.pane_tree.default_on_pane_restore
 }
 ```
 
@@ -334,9 +334,9 @@ resurrect.setup(config, {
 Or call the underlying functions directly, without `setup()`:
 
 ```lua
-resurrect.tab_state.add_safe_restore_processes({ "lazygit", "k9s" })
+resurrect.pane_tree.add_safe_restore_processes({ "lazygit", "k9s" })
 -- or, to fully replace (pass {} to disable process relaunch entirely):
-resurrect.tab_state.set_safe_restore_processes({ "vim", "nvim" })
+resurrect.pane_tree.set_safe_restore_processes({ "vim", "nvim" })
 ```
 
 #### Restoring into the current window
@@ -347,7 +347,7 @@ To restore a window state into the current window use `restore_window` with `clo
 local opts = {
   close_open_tabs = true,
   window = pane:window(),
-  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
   relative = true,
   restore_text = true,
 }
@@ -376,7 +376,7 @@ action = wezterm.action_callback(function(win, pane)
     local opts = {
       relative = true,
       restore_text = true,
-      on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+      on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
     }
     if type == "workspace" then
       local state = resurrect.state_manager.load_state(id, "workspace")
