@@ -231,7 +231,26 @@ function pub.event_driven_save(opts)
 		local last_focus_loss_save = 0
 		wezterm.on("window-focus-changed", function(window, _pane)
 			local win_id = tostring(window:window_id())
-			local is_focused = window:is_focused()
+			local ok, is_focused_or_err = pcall(function()
+				return window:is_focused()
+			end)
+			if not ok then
+				-- window's GUI-side channel can already be closed by the time this
+				-- event fires (e.g. mid-teardown/mid-creation during a workspace
+				-- switch) -- is_focused() does a synchronous round-trip to the GUI
+				-- thread and errors instead of returning. This is an expected,
+				-- handled race (log_info, not log_error) -- skip this event rather
+				-- than letting it crash to the wezterm log.
+				wezterm.log_info(
+					"resurrect: skipped window-focus-changed for window "
+						.. win_id
+						.. ": is_focused() failed, likely because the window's GUI-side"
+						.. " channel was already closed (window mid-teardown/creation): "
+						.. tostring(is_focused_or_err)
+				)
+				return
+			end
+			local is_focused = is_focused_or_err
 			-- Unseen (nil) is treated as "assume was focused," so the very first
 			-- alt-tab-away still triggers a save instead of silently no-oping.
 			if last_focus_state[win_id] ~= false and not is_focused then
