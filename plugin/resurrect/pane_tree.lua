@@ -269,7 +269,8 @@ local SAFE_RESTORE_PROCESSES = {
 	vim = true,
 	nvim = true,
 	emacs = true,
-	man = true,
+	-- uncomment when fixed alt-screen/process-capture race producing bogus "unrecognized process" restores
+	-- man = true,
 	less = true,
 	more = true,
 	top = true,
