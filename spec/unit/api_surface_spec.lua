@@ -68,6 +68,9 @@ describe("public API surface (README contract)", function()
 		assert.are.equal("function", type(resurrect.workspace_state.restore_workspace))
 		assert.are.equal("function", type(resurrect.window_state.save_window_action))
 		assert.are.equal("function", type(resurrect.pane_tree.default_on_pane_restore))
+		-- Back-compat alias (not itself referenced in the README): must keep working
+		-- since this was the documented location before the pane_tree.lua move.
+		assert.are.equal("function", type(resurrect.tab_state.default_on_pane_restore))
 		assert.are.equal("function", type(resurrect.fuzzy_loader.fuzzy_load))
 	end)
 end)

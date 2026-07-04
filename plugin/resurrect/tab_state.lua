@@ -175,11 +175,9 @@ function pub.save_tab_action()
 	end)
 end
 
--- Backward-compat aliases: these were the original implementation (see pane_tree.lua for
--- the current one). Kept so existing configs referencing resurrect.tab_state.* keep working.
+-- Backward-compat alias: this was the original implementation (function moved to pane_tree.lua). 
+-- Kept so existing configs referencing resurrect.tab_state.default_on_pane_restore keep working.
 pub.default_on_pane_restore = pane_tree_mod.default_on_pane_restore
-pub.add_safe_restore_processes = pane_tree_mod.add_safe_restore_processes
-pub.set_safe_restore_processes = pane_tree_mod.set_safe_restore_processes
 
 ---Clears the named-tab registry entry and resets the tab title when a saved
 ---state is deleted via delete_action(). Called by fuzzy_loader.
