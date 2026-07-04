@@ -154,10 +154,12 @@ end
 ---Saves the state whenever the pane or tab structure changes.
 ---More responsive than periodic_save: fires immediately on splits, new tabs,
 ---and closed panes rather than waiting for a timer.
+---Also saves immediately when a GUI window loses OS focus (e.g. alt-tab to
+---another application) -- set save_on_focus_loss = false to disable.
 ---Also supports an optional user variable trigger for shell-reported events
 ---such as directory changes (requires shell integration to send the OSC 1337
 ---SetUserVar sequence; see the README for details).
----@param opts? { save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, user_var: string? }
+---@param opts? { save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, save_on_focus_loss: boolean?, user_var: string? }
 local _event_driven_save_registered = false
 function pub.event_driven_save(opts)
 	if _event_driven_save_registered then
@@ -169,6 +171,9 @@ function pub.event_driven_save(opts)
 	opts = opts or {}
 	if opts.save_workspaces == nil then
 		opts.save_workspaces = true
+	end
+	if opts.save_on_focus_loss == nil then
+		opts.save_on_focus_loss = true
 	end
 
 	local last_structure = {}
@@ -209,6 +214,37 @@ function pub.event_driven_save(opts)
 			do_save(window)
 		end
 	end)
+
+	-- Save the instant a GUI window loses OS focus (e.g. alt-tab to another app).
+	-- window-focus-changed fires on both gain and loss for the window whose focus
+	-- state changed, and window:is_focused() reflects the new state at call time,
+	-- so no cross-window bookkeeping is needed to distinguish "this window lost
+	-- focus" from "a different window gained it" -- that never fires this event
+	-- for this window. last_focus_state still tracks per-window state, purely to
+	-- collapse repeated same-state firings into a single save. The debounce below
+	-- caps this to one save per FOCUS_LOSS_DEBOUNCE_SECONDS regardless of window
+	-- count, since do_save can shell out synchronously to an encryption subprocess
+	-- and rapid alt-tabbing shouldn't spawn one on every bounce.
+	if opts.save_on_focus_loss then
+		local FOCUS_LOSS_DEBOUNCE_SECONDS = 10
+		local last_focus_state = {}
+		local last_focus_loss_save = 0
+		wezterm.on("window-focus-changed", function(window, _pane)
+			local win_id = tostring(window:window_id())
+			local is_focused = window:is_focused()
+			-- Unseen (nil) is treated as "assume was focused," so the very first
+			-- alt-tab-away still triggers a save instead of silently no-oping.
+			if last_focus_state[win_id] ~= false and not is_focused then
+				local now = os.time()
+				if now - last_focus_loss_save >= FOCUS_LOSS_DEBOUNCE_SECONDS then
+					last_focus_loss_save = now
+					wezterm.log_info("resurrect: saved (focus-loss)")
+					do_save(window)
+				end
+			end
+			last_focus_state[win_id] = is_focused
+		end)
+	end
 
 	-- Optional: also save when the shell reports a user-defined variable change.
 	-- Useful for saving on directory change. Example shell integration (zsh/bash):
