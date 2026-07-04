@@ -90,8 +90,8 @@ resurrect.setup(config, {
 > relaunched when restoring a pane left in alt-screen mode; anything not on the list is
 > skipped with a log warning. The built-in defaults already cover common tools — see
 > [Configuring the safe-restore process list](#configuring-the-safe-restore-process-list)
-> for the full default list, the security rationale, and advanced usage. If both `add`
-> and `replace` are given, `replace` wins and `add` is ignored.
+> for the full default list, the security rationale, and advanced usage. Set only one of
+> `add` or `replace`; if both are given, `replace` takes precedence and `add` is ignored.
 
 When `keybindings = true`, the following bindings are added:
 
@@ -328,7 +328,8 @@ resurrect.setup(config, {
 ```
 
 > [!NOTE]
-> If both `add` and `replace` are given, `replace` wins and `add` is ignored.
+> Set only one of `add` or `replace`; if both are given, `replace` takes precedence and
+> `add` is ignored.
 
 Or call the underlying functions directly, without `setup()`:
 
