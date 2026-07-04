@@ -4,8 +4,14 @@ local utils = require("resurrect.utils")
 
 ---@class pane_tree_module
 ---@field max_nlines integer
+---@field process_restore_delay_seconds integer
 local pub = {}
 pub.max_nlines = 3500
+
+-- Seconds to wait before sending a process-restore command to a pane.
+-- Shells need a moment to initialise before they can accept input.
+-- Set via resurrect.setup(config, { restore_delay = N }) or resurrect.pane_tree.process_restore_delay_seconds directly.
+pub.process_restore_delay_seconds = 0
 
 ---@alias Pane any
 ---@alias PaneInformation {left: integer, top: integer, height: integer, width: integer}
@@ -249,6 +255,92 @@ function pub.fold(pane_tree, acc, f)
 	end
 
 	return acc
+end
+
+-- Known safe executables that can be restored via send_text.
+-- Process names not in this set will be logged but not auto-launched,
+-- preventing arbitrary command execution from tampered state files.
+-- Customize via pub.add_safe_restore_processes()/pub.set_safe_restore_processes()
+-- or resurrect.setup(config, { safe_restore_processes = { add = {...} } }).
+-- Mirrors tmux-resurrect's default @resurrect-processes list:
+-- https://github.com/tmux-plugins/tmux-resurrect/blob/master/docs/restoring_programs.md
+local SAFE_RESTORE_PROCESSES = {
+	vi = true,
+	vim = true,
+	nvim = true,
+	emacs = true,
+	-- uncomment when fixed alt-screen/process-capture race producing bogus "unrecognized process" restores
+	-- man = true,
+	less = true,
+	more = true,
+	top = true,
+	htop = true,
+	irssi = true,
+	weechat = true,
+	mutt = true,
+}
+
+---Adds additional process names to the safe-restore allowlist, on top of the
+---built-in defaults.
+---@param names string[]
+function pub.add_safe_restore_processes(names)
+	for _, name in ipairs(names) do
+		SAFE_RESTORE_PROCESSES[name:lower()] = true
+	end
+end
+
+---Replaces the safe-restore allowlist entirely, discarding the built-in
+---defaults. Pass an empty table to disable process relaunch on restore.
+---@param names string[]
+function pub.set_safe_restore_processes(names)
+	SAFE_RESTORE_PROCESSES = {}
+	pub.add_safe_restore_processes(names)
+end
+
+--- Function to restore text or processes when restoring panes
+---@param pane_tree pane_tree
+function pub.default_on_pane_restore(pane_tree)
+	local pane = pane_tree.pane
+
+	-- Spawn process if using alt screen, otherwise restore text
+	if pane_tree.alt_screen_active and pane_tree.process and pane_tree.process.argv then
+		local proc_name = pane_tree.process.name or ""
+		-- Extract base name without path
+		local base_name = proc_name:match("[/\\]?([^/\\]+)$") or proc_name
+		base_name = base_name:gsub("%.exe$", ""):lower()
+
+		if SAFE_RESTORE_PROCESSES[base_name] then
+			local cmd = wezterm.shell_join_args(pane_tree.process.argv) .. "\r\n"
+			if pub.process_restore_delay_seconds > 0 then
+				wezterm.time.call_after(pub.process_restore_delay_seconds, function()
+					pane:send_text(cmd)
+				end)
+			else
+				pane:send_text(cmd)
+			end
+		else
+			-- base_name comes from process.name, which some programs set to something
+			-- other than their executable (e.g. a version string) -- log the executable
+			-- path too so the actual command is identifiable, not just that opaque name.
+			-- argv is deliberately omitted: it can carry secrets (tokens, passwords) that
+			-- shouldn't end up in the log.
+			wezterm.log_warn(
+				"resurrect: skipping restore of unrecognized process: "
+					.. base_name
+					.. " (executable: "
+					.. (pane_tree.process.executable or "?")
+					.. ") (add to SAFE_RESTORE_PROCESSES if intended)"
+			)
+		end
+	elseif pane_tree.text then
+		-- Kept as a defensive pass for state files saved before capture-time
+		-- trimming existed; a no-op for freshly saved state.
+		local text = utils.strip_trailing_blank_rows(pane_tree.text)
+		pane:inject_output(text)
+		restore_baseline.register(pane, text)
+		-- Send newline to trigger a fresh shell prompt at the correct position
+		pane:send_text("\r\n")
+	end
 end
 
 return pub

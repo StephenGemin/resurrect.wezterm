@@ -1,16 +1,9 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local pane_tree_mod = require("resurrect.pane_tree")
 local state_manager_mod = require("resurrect.state_manager")
-local restore_baseline = require("resurrect.restore_baseline")
-local utils = require("resurrect.utils")
 local pub = {}
 
 local _named_tabs = {} -- {[tab_id: integer] = name: string}
-
--- Seconds to wait before sending a process-restore command to a pane.
--- Shells need a moment to initialise before they can accept input.
--- Set via resurrect.setup(config, { restore_delay = N }) or directly.
-pub.process_restore_delay_seconds = 0
 
 ---Function used to split panes when mapping over the pane_tree
 ---@param opts restore_opts
@@ -195,70 +188,9 @@ function pub.save_tab_action()
 	end)
 end
 
--- Known safe executables that can be restored via send_text.
--- Process names not in this set will be logged but not auto-launched,
--- preventing arbitrary command execution from tampered state files.
-local SAFE_RESTORE_PROCESSES = {
-	vim = true,
-	nvim = true,
-	gvim = true,
-	vi = true,
-	htop = true,
-	btop = true,
-	top = true,
-	less = true,
-	more = true,
-	man = true,
-	nano = true,
-	tmux = true,
-	screen = true,
-}
-
---- Function to restore text or processes when restoring panes
----@param pane_tree pane_tree
-function pub.default_on_pane_restore(pane_tree)
-	local pane = pane_tree.pane
-
-	-- Spawn process if using alt screen, otherwise restore text
-	if pane_tree.alt_screen_active and pane_tree.process and pane_tree.process.argv then
-		local proc_name = pane_tree.process.name or ""
-		-- Extract base name without path
-		local base_name = proc_name:match("[/\\]?([^/\\]+)$") or proc_name
-		base_name = base_name:gsub("%.exe$", ""):lower()
-
-		if SAFE_RESTORE_PROCESSES[base_name] then
-			local cmd = wezterm.shell_join_args(pane_tree.process.argv) .. "\r\n"
-			if pub.process_restore_delay_seconds > 0 then
-				wezterm.time.call_after(pub.process_restore_delay_seconds, function()
-					pane:send_text(cmd)
-				end)
-			else
-				pane:send_text(cmd)
-			end
-		else
-			-- base_name comes from process.name, which some programs set to something
-			-- other than their executable (e.g. a version string) -- log the executable
-			-- path too so the actual command is identifiable, not just that opaque name.
-			-- argv is deliberately omitted: it can carry secrets (tokens, passwords) that
-			-- shouldn't end up in the log.
-			wezterm.log_warn(
-				"resurrect: skipping restore of unrecognized process: "
-					.. base_name
-					.. " (executable: "
-					.. (pane_tree.process.executable or "?")
-					.. ") (add to SAFE_RESTORE_PROCESSES if intended)"
-			)
-		end
-	elseif pane_tree.text then
-		-- Kept as a defensive pass for state files saved before capture-time
-		-- trimming existed; a no-op for freshly saved state.
-		local text = utils.strip_trailing_blank_rows(pane_tree.text)
-		pane:inject_output(text)
-		restore_baseline.register(pane, text)
-		-- Send newline to trigger a fresh shell prompt at the correct position
-		pane:send_text("\r\n")
-	end
-end
+---Backward-compat alias: this was the original implementation (function moved to pane_tree.lua).
+---Kept so existing configs referencing resurrect.tab_state.default_on_pane_restore keep working.
+pub.default_on_pane_restore = pane_tree_mod.default_on_pane_restore
 
 ---Clears the named-tab registry entry and resets the tab title when a saved
 ---state is deleted via delete_action(). Called by fuzzy_loader.

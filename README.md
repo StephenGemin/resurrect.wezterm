@@ -19,6 +19,7 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
     - [Saving state](#saving-state)
     - [Restoring state](#restoring-state)
       - [restore\_opts](#restore_opts)
+      - [Configuring the safe-restore process list](#configuring-the-safe-restore-process-list)
       - [Restoring into the current window](#restoring-into-the-current-window)
       - [Windows not resizing correctly](#windows-not-resizing-correctly)
       - [Manual dispatch](#manual-dispatch)
@@ -80,8 +81,17 @@ resurrect.setup(config, {
   save_tabs         = true,
   keybindings       = true,  -- set false to define your own (see below)
   status_bar        = true,  -- show last save time and tab titles in the right status bar
+  safe_restore_processes = nil, -- { add = {...} } or { replace = {...} }, see below
 })
 ```
+
+> [!NOTE]
+> `safe_restore_processes` controls which foreground processes (e.g. `vim`, `htop`) are
+> relaunched when restoring a pane left in alt-screen mode; anything not on the list is
+> skipped with a log warning. The built-in defaults already cover common tools — see
+> [Configuring the safe-restore process list](#configuring-the-safe-restore-process-list)
+> for the full default list, the security rationale, and advanced usage. Set only one of
+> `add` or `replace`; if both are given, `replace` takes precedence and `add` is ignored.
 
 When `keybindings = true`, the following bindings are added:
 
@@ -250,7 +260,7 @@ Tab restores always add to the current window, since a tab can't exist outside o
 action = resurrect.fuzzy_loader.restore_action({
   relative        = true,
   restore_text    = true,
-  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
   -- fuzzy_load_opts = { show_state_with_date = true },
 })
 ```
@@ -271,7 +281,7 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
   tab: MuxTab?,                 -- Restore in this tab
   window: MuxWindow,            -- Restore in this window
   resize_window: boolean?,      -- Resizes the window, default: true
-  on_pane_restore: fun(pane_tree: pane_tree), -- Function to restore panes; use resurrect.tab_state.default_on_pane_restore
+  on_pane_restore: fun(pane_tree: pane_tree), -- Function to restore panes; use resurrect.pane_tree.default_on_pane_restore
 }
 ```
 
@@ -289,6 +299,46 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 > which defaulted to `false`. If you relied on restored windows landing in the
 > `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
 
+#### Configuring the safe-restore process list
+
+When restoring a pane that was left in alt-screen mode (e.g. an editor or a TUI app),
+`default_on_pane_restore` only relaunches the foreground process if its executable name
+is on an allowlist. This exists as a security control — it prevents arbitrary command
+execution from a tampered state file — not just to reduce restore noise, so replacing or
+emptying the list trades that protection for convenience.
+
+The built-in defaults mirror
+[tmux-resurrect's default `@resurrect-processes` list](https://github.com/tmux-plugins/tmux-resurrect/blob/master/docs/restoring_programs.md),
+the same conservative allowlist used by the tmux plugin this one is modeled after:
+
+```
+vi, vim, nvim, emacs, man, less, more, top, htop, irssi, weechat, mutt
+```
+
+(`tail` is on tmux-resurrect's list too, but is omitted here — it never uses the
+alt-screen buffer, so it would never reach this allowlist check in the first place.)
+
+Extend or replace the list via `resurrect.setup()`:
+
+```lua
+resurrect.setup(config, {
+  safe_restore_processes = { add = { "lazygit", "k9s" } },
+  -- or: safe_restore_processes = { replace = { "vim", "nvim" } },
+})
+```
+
+> [!NOTE]
+> Set only one of `add` or `replace`; if both are given, `replace` takes precedence and
+> `add` is ignored.
+
+Or call the underlying functions directly, without `setup()`:
+
+```lua
+resurrect.pane_tree.add_safe_restore_processes({ "lazygit", "k9s" })
+-- or, to fully replace (pass {} to disable process relaunch entirely):
+resurrect.pane_tree.set_safe_restore_processes({ "vim", "nvim" })
+```
+
 #### Restoring into the current window
 
 To restore a window state into the current window use `restore_window` with `close_open_tabs`:
@@ -297,7 +347,7 @@ To restore a window state into the current window use `restore_window` with `clo
 local opts = {
   close_open_tabs = true,
   window = pane:window(),
-  on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+  on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
   relative = true,
   restore_text = true,
 }
@@ -326,7 +376,7 @@ action = wezterm.action_callback(function(win, pane)
     local opts = {
       relative = true,
       restore_text = true,
-      on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+      on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
     }
     if type == "workspace" then
       local state = resurrect.state_manager.load_state(id, "workspace")

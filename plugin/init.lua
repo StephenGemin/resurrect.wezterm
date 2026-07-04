@@ -16,6 +16,7 @@ local function init()
 	pub.workspace_state = require("resurrect.workspace_state")
 	pub.window_state = require("resurrect.window_state")
 	pub.tab_state = require("resurrect.tab_state")
+	pub.pane_tree = require("resurrect.pane_tree")
 	pub.fuzzy_loader = require("resurrect.fuzzy_loader")
 	pub.state_manager = require("resurrect.state_manager")
 end
@@ -36,8 +37,10 @@ init()
 ---   save_tabs          = true
 ---   keybindings        = true   -- add Alt+W/R/Shift+W/Shift+T bindings
 ---   status_bar         = true   -- show save time + tab titles in right status
+---   safe_restore_processes = { add = {...} } or { replace = {...} } -- extend/replace
+---                                the allowlist of processes relaunched on restore
 ---
----@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, keybindings: boolean?, status_bar: boolean?}
+---@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, keybindings: boolean?, status_bar: boolean?, safe_restore_processes: {add: string[]?, replace: string[]?}?}
 
 ---@param config table wezterm config_builder object
 ---@param opts? setup_opts optional overrides
@@ -64,7 +67,16 @@ function pub.setup(config, opts)
 
 	-- Restore delay for process commands (shells need time to init)
 	if opts.restore_delay then
-		pub.tab_state.process_restore_delay_seconds = opts.restore_delay
+		pub.pane_tree.process_restore_delay_seconds = opts.restore_delay
+	end
+
+	-- Safe-restore process allowlist: extend or replace the defaults
+	if opts.safe_restore_processes then
+		if opts.safe_restore_processes.replace then
+			pub.pane_tree.set_safe_restore_processes(opts.safe_restore_processes.replace)
+		elseif opts.safe_restore_processes.add then
+			pub.pane_tree.add_safe_restore_processes(opts.safe_restore_processes.add)
+		end
 	end
 
 	-- Restore workspace on startup
