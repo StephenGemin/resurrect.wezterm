@@ -175,8 +175,8 @@ function pub.save_tab_action()
 	end)
 end
 
--- Backward-compat alias: this was the original implementation (function moved to pane_tree.lua). 
--- Kept so existing configs referencing resurrect.tab_state.default_on_pane_restore keep working.
+---Backward-compat alias: this was the original implementation (function moved to pane_tree.lua).
+---Kept so existing configs referencing resurrect.tab_state.default_on_pane_restore keep working.
 pub.default_on_pane_restore = pane_tree_mod.default_on_pane_restore
 
 ---Clears the named-tab registry entry and resets the tab title when a saved
