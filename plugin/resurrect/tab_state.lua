@@ -187,20 +187,21 @@ end
 -- preventing arbitrary command execution from tampered state files.
 -- Customize via pub.add_safe_restore_processes()/pub.set_safe_restore_processes()
 -- or resurrect.setup(config, { safe_restore_processes = { add = {...} } }).
+-- Mirrors tmux-resurrect's default @resurrect-processes list:
+-- https://github.com/tmux-plugins/tmux-resurrect/blob/master/docs/restoring_programs.md
 local SAFE_RESTORE_PROCESSES = {
+	vi = true,
 	vim = true,
 	nvim = true,
-	gvim = true,
-	vi = true,
-	htop = true,
-	btop = true,
-	top = true,
+	emacs = true,
+	man = true,
 	less = true,
 	more = true,
-	man = true,
-	nano = true,
-	tmux = true,
-	screen = true,
+	top = true,
+	htop = true,
+	irssi = true,
+	weechat = true,
+	mutt = true,
 }
 
 ---Adds additional process names to the safe-restore allowlist, on top of the
