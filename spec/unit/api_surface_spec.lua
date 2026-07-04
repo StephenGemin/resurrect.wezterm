@@ -36,7 +36,11 @@ describe("public API surface (README contract)", function()
 			get_tab_state = "function",
 			save_tab_action = "function",
 			restore_tab = "function",
+		},
+		["resurrect.pane_tree"] = {
 			default_on_pane_restore = "function",
+			add_safe_restore_processes = "function",
+			set_safe_restore_processes = "function",
 		},
 		["resurrect.fuzzy_loader"] = {
 			fuzzy_load = "function",
@@ -63,7 +67,7 @@ describe("public API surface (README contract)", function()
 		assert.are.equal("function", type(resurrect.state_manager.save_state))
 		assert.are.equal("function", type(resurrect.workspace_state.restore_workspace))
 		assert.are.equal("function", type(resurrect.window_state.save_window_action))
-		assert.are.equal("function", type(resurrect.tab_state.default_on_pane_restore))
+		assert.are.equal("function", type(resurrect.pane_tree.default_on_pane_restore))
 		assert.are.equal("function", type(resurrect.fuzzy_loader.fuzzy_load))
 	end)
 end)

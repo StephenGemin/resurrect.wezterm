@@ -16,6 +16,7 @@ local function init()
 	pub.workspace_state = require("resurrect.workspace_state")
 	pub.window_state = require("resurrect.window_state")
 	pub.tab_state = require("resurrect.tab_state")
+	pub.pane_tree = require("resurrect.pane_tree")
 	pub.fuzzy_loader = require("resurrect.fuzzy_loader")
 	pub.state_manager = require("resurrect.state_manager")
 end
@@ -66,15 +67,15 @@ function pub.setup(config, opts)
 
 	-- Restore delay for process commands (shells need time to init)
 	if opts.restore_delay then
-		pub.tab_state.process_restore_delay_seconds = opts.restore_delay
+		pub.pane_tree.process_restore_delay_seconds = opts.restore_delay
 	end
 
 	-- Safe-restore process allowlist: extend or replace the defaults
 	if opts.safe_restore_processes then
 		if opts.safe_restore_processes.replace then
-			pub.tab_state.set_safe_restore_processes(opts.safe_restore_processes.replace)
+			pub.pane_tree.set_safe_restore_processes(opts.safe_restore_processes.replace)
 		elseif opts.safe_restore_processes.add then
-			pub.tab_state.add_safe_restore_processes(opts.safe_restore_processes.add)
+			pub.pane_tree.add_safe_restore_processes(opts.safe_restore_processes.add)
 		end
 	end
 
