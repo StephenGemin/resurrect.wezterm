@@ -238,6 +238,7 @@ function pub.event_driven_save(opts)
 				local now = os.time()
 				if now - last_focus_loss_save >= FOCUS_LOSS_DEBOUNCE_SECONDS then
 					last_focus_loss_save = now
+					wezterm.log_info("resurrect: saved (focus-loss)")
 					do_save(window)
 				end
 			end
