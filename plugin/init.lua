@@ -35,12 +35,13 @@ init()
 ---   save_workspaces    = true
 ---   save_windows       = true
 ---   save_tabs          = true
+---   save_on_focus_loss = true   -- also save immediately when a window loses OS focus (e.g. alt-tab away)
 ---   keybindings        = true   -- add Alt+W/R/Shift+W/Shift+T bindings
 ---   status_bar         = true   -- show save time + tab titles in right status
 ---   safe_restore_processes = { add = {...} } or { replace = {...} } -- extend/replace
 ---                                the allowlist of processes relaunched on restore
 ---
----@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, keybindings: boolean?, status_bar: boolean?, safe_restore_processes: {add: string[]?, replace: string[]?}?}
+---@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, save_on_focus_loss: boolean?, keybindings: boolean?, status_bar: boolean?, safe_restore_processes: {add: string[]?, replace: string[]?}?}
 
 ---@param config table wezterm config_builder object
 ---@param opts? setup_opts optional overrides
@@ -49,12 +50,14 @@ function pub.setup(config, opts)
 	local save_workspaces = opts.save_workspaces ~= false
 	local save_windows = opts.save_windows ~= false
 	local save_tabs = opts.save_tabs ~= false
+	local save_on_focus_loss = opts.save_on_focus_loss ~= false
 
-	-- Event-driven save: fires on pane/tab structure changes
+	-- Event-driven save: fires on pane/tab structure changes and window focus loss
 	pub.state_manager.event_driven_save({
 		save_workspaces = save_workspaces,
 		save_windows = save_windows,
 		save_tabs = save_tabs,
+		save_on_focus_loss = save_on_focus_loss,
 	})
 
 	-- Periodic save as a safety net

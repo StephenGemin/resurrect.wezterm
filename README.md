@@ -50,6 +50,7 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
 - Restore shell output from a saved session.
 - Save the state of your current window, with every window, tab and pane state stored in a `json` file.
 - Restore the save from a `json` file.
+- Automatically saves your session the instant you switch away from wezterm (alt-tab to another app) — not just on a timer.
 - Re-attach to remote domains (e.g. SSH, SSHMUX, WSL, Docker, ect.).
 - Optionally enable encryption and decryption of the saved state.
 
@@ -79,6 +80,7 @@ resurrect.setup(config, {
   save_workspaces   = true,
   save_windows      = true,
   save_tabs         = true,
+  save_on_focus_loss = true, -- also save immediately on alt-tab away
   keybindings       = true,  -- set false to define your own (see below)
   status_bar        = true,  -- show last save time and tab titles in the right status bar
   safe_restore_processes = nil, -- { add = {...} } or { replace = {...} }, see below
