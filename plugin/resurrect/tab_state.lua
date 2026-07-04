@@ -185,6 +185,8 @@ end
 -- Known safe executables that can be restored via send_text.
 -- Process names not in this set will be logged but not auto-launched,
 -- preventing arbitrary command execution from tampered state files.
+-- Customize via pub.add_safe_restore_processes()/pub.set_safe_restore_processes()
+-- or resurrect.setup(config, { safe_restore_processes = { add = {...} } }).
 local SAFE_RESTORE_PROCESSES = {
 	vim = true,
 	nvim = true,
@@ -200,6 +202,23 @@ local SAFE_RESTORE_PROCESSES = {
 	tmux = true,
 	screen = true,
 }
+
+---Adds additional process names to the safe-restore allowlist, on top of the
+---built-in defaults.
+---@param names string[]
+function pub.add_safe_restore_processes(names)
+	for _, name in ipairs(names) do
+		SAFE_RESTORE_PROCESSES[name:lower()] = true
+	end
+end
+
+---Replaces the safe-restore allowlist entirely, discarding the built-in
+---defaults. Pass an empty table to disable process relaunch on restore.
+---@param names string[]
+function pub.set_safe_restore_processes(names)
+	SAFE_RESTORE_PROCESSES = {}
+	pub.add_safe_restore_processes(names)
+end
 
 --- Function to restore text or processes when restoring panes
 ---@param pane_tree pane_tree
