@@ -15,8 +15,12 @@ pub.default_fuzzy_load_opts = {
 	description = "Select State to Load and press Enter = accept, Esc = cancel, / = filter",
 	-- Branding lives on fuzzy_description, not description: with is_fuzzy = true the
 	-- picker opens straight into fuzzy mode and only the fuzzy_description is shown.
-	fuzzy_description = (wezterm.nerdfonts.md_backup_restore or "")
-		.. "  resurrect.wezterm · select state to restore: ",
+	-- Bold is the only emphasis available -- InputSelector can't enlarge the header
+	-- font -- and only takes effect if the prompt honors wezterm.format escapes.
+	fuzzy_description = wezterm.format({
+		{ Attribute = { Intensity = "Bold" } },
+		{ Text = (wezterm.nerdfonts.md_backup_restore or "") .. "  resurrect.wezterm · select state to restore: " },
+	}),
 	is_fuzzy = true,
 	ignore_workspaces = false,
 	ignore_windows = false,
@@ -344,8 +348,10 @@ function pub.delete_action(opts)
 		title = "Delete State",
 		description = "Select a state to delete   (Enter = delete, Esc = cancel, / = filter)",
 		-- Own prompt so the shared default doesn't say "restore" while deleting.
-		fuzzy_description = (wezterm.nerdfonts.md_backup_restore or "")
-			.. "  resurrect.wezterm · select state to delete: ",
+		fuzzy_description = wezterm.format({
+			{ Attribute = { Intensity = "Bold" } },
+			{ Text = (wezterm.nerdfonts.md_backup_restore or "") .. "  resurrect.wezterm · select state to delete: " },
+		}),
 		is_fuzzy = true,
 	}, opts or {})
 	return wezterm.action_callback(function(win, pane)
