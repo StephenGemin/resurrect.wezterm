@@ -97,3 +97,42 @@ describe("fuzzy_load: file discovery", function()
 		assert.is_true(ids["tab" .. sep .. "mytab.json"])
 	end)
 end)
+
+describe("fuzzy_load: sorting and path parsing", function()
+	-- One "epoch path" line, letting each entry pick its own mtime.
+	local function line(epoch, type, name)
+		return epoch .. " " .. FAKE_DIR .. sep .. type .. sep .. name .. ".json"
+	end
+
+	it("orders entries newest-first within a type", function()
+		local stdout = table.concat({
+			line(1000000100, "workspace", "older"),
+			line(1000000300, "workspace", "newest"),
+			line(1000000200, "workspace", "middle"),
+		}, "\n") .. "\n"
+		local fuzzy_loader = setup(stdout)
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		local choices = captured[1].arg.choices
+		assert.equals("workspace" .. sep .. "newest.json", choices[1].id)
+		assert.equals("workspace" .. sep .. "middle.json", choices[2].id)
+		assert.equals("workspace" .. sep .. "older.json", choices[3].id)
+	end)
+
+	it("keeps spaces in the path when building the choice id", function()
+		-- Mirrors the real macOS state dir: a space in a directory ("Application
+		-- Support") and in the state name. The greedy full-path capture must keep
+		-- the row rather than silently dropping it.
+		local spaced = "/tmp/App Support/wezterm/workspace/my project.json"
+		local fuzzy_loader = setup("1000000000 " .. spaced .. "\n")
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		local choices = captured[1].arg.choices
+		assert.equals(1, #choices)
+		assert.equals("workspace" .. sep .. "my project.json", choices[1].id)
+	end)
+end)

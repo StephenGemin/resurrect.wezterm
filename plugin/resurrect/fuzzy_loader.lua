@@ -13,13 +13,16 @@ local pub = {}
 pub.default_fuzzy_load_opts = {
 	title = "Load State",
 	description = "Select State to Load and press Enter = accept, Esc = cancel, / = filter",
-	fuzzy_description = "Search State to Load: ",
+	-- Branding lives on fuzzy_description, not description: with is_fuzzy = true the
+	-- picker opens straight into fuzzy mode and only the fuzzy_description is shown.
+	fuzzy_description = (wezterm.nerdfonts.md_backup_restore or "")
+		.. "  resurrect.wezterm · select state to restore: ",
 	is_fuzzy = true,
 	ignore_workspaces = false,
 	ignore_windows = false,
 	ignore_tabs = false,
 	ignore_screen_width = true,
-	date_format = "%d-%m-%Y %H:%M:%S",
+	date_format = "%Y-%m-%d %H:%M",
 	show_state_with_date = false,
 	name_truncature = " " .. wezterm.nerdfonts.cod_ellipsis .. "  ",
 	min_filename_size = 10,
@@ -99,160 +102,94 @@ local function find_json_files_recursive(base_path)
 	end
 end
 
--- build a table with the output of the file finder function
+local COL_GAP = "  "
+
+-- Build the InputSelector choice list from the finder output: one row per saved
+-- state, grouped workspace -> window -> tab and newest-saved first within each
+-- group. When show_state_with_date is set, a trailing date column is aligned by
+-- padding the single name column (InputSelector has no real multi-column API, so
+-- widths are hand-measured on escape-stripped text).
 ---@param stdout string|nil
 ---@param opts table
 ---@return table
 local function insert_choices(stdout, opts)
-	-- this structure will contain the formatting costs for each elements
-	local fmt_cost = {}
-	-- pre-calculation of formatting cost
-	local types = { "workspace", "window", "tab" }
 	local state_files = {}
-	local files = {
-		workspace = {},
-		window = {},
-		tab = {},
-	}
-	local max_length = 0
-
 	if stdout == nil then
 		return state_files
 	end
 
-	-- Parse the stdout and construct the file table
+	local types = { "workspace", "window", "tab" }
+	local files = { workspace = {}, window = {}, tab = {} }
+
 	for line in stdout:gmatch("[^\n]+") do
 		local epoch, type, file = line:match("%s*(%d+)%s+.+[/\\]([^/\\]+)[/\\]([^/\\]+%.json)$")
-		-- epoch in this case represents the last modified date/time according to the OS
-		-- For Unix/POSIX Epoch is counted from January 1st, 1970 0 UTC
-		-- MacOS it is from January 1st, 1904 0 UTC
-		-- Windows NTFS (up to Win 11) it is from January 1st, 1601 0 UTC
-		-- The function `os.date()` used later on will convert the date according to the host OS
-		if epoch and file and type and not opts[string.format("ignore_%ss", type)] then
-			-- consider the "cost" of the formatting of the filename, i.e., if the format function adds characters
-			-- to the visible part of the file section, we test the three possible formatter to get the highest cost
-			-- we use a real entry instead of an empty string to prevent formatting error if the format function has
-			-- expectations to work correctly
-			-- This prevent from having to format every filename, instead we can take the filename length and then
-			-- the cost of formatting per type
-			--
-			if next(fmt_cost) == nil then
-				fmt_cost.workspace = 0 -- cost of formatting the workspace name
-				fmt_cost.window = 0 -- cost of formatting the window name
-				fmt_cost.tab = 0 -- cost of formatting the tab
-				fmt_cost.str_date = 0 -- cost of date as a string
-				fmt_cost.fmt_date = 0 -- cost of formatting the date
-				-- Calculate the cost for formatting the filename
-				local len = utils.utf8len(file)
-				for _, t in ipairs(types) do
-					if not opts[string.format("ignore_%ss", t)] then
-						local fmt = opts[string.format("fmt_%s", t)]
-						if fmt then
-							fmt_cost[t] = utils.utf8len(utils.strip_format_esc_seq(fmt(file))) - len
-						end
-					end
-				end
-				-- Calculate the cost for formatting the date
-				if opts.show_state_with_date then
-					local str_date = " " .. os.date(opts.date_format, tonumber(epoch))
-					fmt_cost.str_date = utils.utf8len(str_date)
-					if opts.fmt_date then
-						fmt_cost.fmt_date = utils.utf8len(utils.strip_format_esc_seq(opts.fmt_date(str_date)))
-							- fmt_cost.str_date
-					end
-				end
-			end
-
-			-- Calculating the maximum file length
-			local filename_len = utils.utf8len(file) + fmt_cost[type] -- we keep this so we don't have to measure it later
-			max_length = math.max(max_length, filename_len)
-
-			local date = ""
-			if opts.show_state_with_date then
-				date = " " .. os.date(opts.date_format, tonumber(epoch))
-				if opts.fmt_date then
-					date = opts.fmt_date(date)
-				end
-			end
-			local date_len = utils.utf8len(utils.strip_format_esc_seq(date))
-
-			-- collecting all relevant information about the file
-			local fmt = opts[string.format("fmt_%s", type)]
+		if epoch and type and file and files[type] and not opts[string.format("ignore_%ss", type)] then
 			table.insert(files[type], {
 				id = type .. utils.separator .. file,
-				filename = file,
-				filename_len = filename_len,
-				date = date,
-				date_len = date_len,
-				fmt = fmt,
+				epoch = tonumber(epoch),
+				name = (file:gsub("%.json$", "")),
+				fmt = opts[string.format("fmt_%s", type)],
 			})
 		end
 	end
 
-	if max_length == 0 then
+	-- Grouped workspace -> window -> tab, newest-first within each group.
+	local ordered = {}
+	for _, type in ipairs(types) do
+		table.sort(files[type], function(a, b)
+			return a.epoch > b.epoch
+		end)
+		for _, entry in ipairs(files[type]) do
+			table.insert(ordered, entry)
+		end
+	end
+	if #ordered == 0 then
 		return state_files
 	end
 
-	local available_width
-	if opts.ignore_screen_width then
-		available_width = max_length + (fmt_cost.str_date or 0) + (fmt_cost.fmt_date or 0)
-	else
-		-- During the selection view, InputSelector will take 4 characters on the left and 2 characters
-		-- on the right of the window
-		available_width = utils.get_current_window_width() - 6
+	-- Measure each entry's visible name width; the date is a single trailing column.
+	local name_max = 0
+	for _, e in ipairs(ordered) do
+		e.name_w = utils.utf8len(utils.strip_format_esc_seq(e.fmt and e.fmt(e.name) or e.name))
+		name_max = math.max(name_max, e.name_w)
+		e.date = opts.show_state_with_date and os.date(opts.date_format, e.epoch) or ""
 	end
 
-	-- constants used to shorten the file name if necessary
-	local str_pad = opts.name_truncature or "..."
-	local pad_len = utils.utf8len(str_pad)
-	local min_filename_len = opts.min_filename_size or 10 -- minimum size of the filename to remain decypherable
-
-	-- Add files to state_files list and apply the formatting functions
-	for _, type in ipairs(types) do
-		for _, file in ipairs(files[type]) do
-			local label = file.filename
-			local dots = ""
-
-			local filename_date_len = file.filename_len + file.date_len
-
-			-- we prepare here the dots separator between the file name and the date, taking into account the space available
-			-- if not enough space available the separator will be limited to the single space that is prefixing the date
-			-- if there is enough space, we can make the display prettier by have a space between the file name and the
-			-- dots separator
-			if opts.show_state_with_date then
-				local dots_len = math.max(available_width - filename_date_len, 0)
-				dots = string.rep(".", dots_len)
-
-				-- if there is enough room we can have a space between the filename and the dots
-				if #dots > 3 then
-					dots = " " .. dots:sub(2)
-				end
-			end
-
-			-- to fit in the space we use we would need to reduce the filename by that much
-			-- but keeping in mind that we don't want the name to become too small
-			if filename_date_len + #dots > available_width then
-				-- Formulas kept for documentation:
-				-- 1. calculate the necessary reduction of the filename
-				-- local reduction = file.filename_len + file.date_len + pad_len + #dots - available_width
-				-- 2. correction of the reduction in case the resulting name length is smaller than the minimym
-				-- reduction = file.filename_len - math.max(file.filename_len - reduction, min_filename_len + pad_len)
-				-- 3. putting things together in a single formula
-				local reduction = file.filename_len
-					- math.max(available_width - file.date_len - pad_len - #dots, min_filename_len + pad_len)
-				label = utils.replace_center(label, reduction, str_pad)
-			end
-
-			-- and now everything comes together
-			label = label .. dots
-			if file.fmt then
-				label = file.fmt(label)
-			end
-			label = label .. file.date
-
-			table.insert(state_files, { id = file.id, label = label })
+	-- With a date column and a fixed window, cap width and truncate names to fit.
+	if opts.show_state_with_date and not opts.ignore_screen_width then
+		local total = name_max + utils.utf8len(COL_GAP) + utils.utf8len(ordered[1].date)
+		local overflow = total - (utils.get_current_window_width() - 6)
+		if overflow > 0 then
+			name_max = math.max(name_max - overflow, opts.min_filename_size or 10)
 		end
 	end
+
+	for _, e in ipairs(ordered) do
+		local base = e.name
+		if e.date ~= "" then
+			-- Truncate the plain name toward the min size so the date column aligns.
+			local target = name_max - (e.name_w - utils.utf8len(base)) -- minus the "<icon> : " prefix
+			if utils.utf8len(base) > target then
+				local pad = opts.name_truncature or "..."
+				local reduction = #base - math.max(target - utils.utf8len(pad), opts.min_filename_size or 10)
+				if reduction > 0 then
+					base = utils.replace_center(base, reduction, pad)
+				end
+			end
+		end
+
+		local label = e.fmt and e.fmt(base) or base
+		if e.date ~= "" then
+			local name_vis = utils.utf8len(utils.strip_format_esc_seq(label))
+			label = label
+				.. string.rep(" ", math.max(name_max - name_vis, 0))
+				.. COL_GAP
+				.. (opts.fmt_date and opts.fmt_date(e.date) or e.date)
+		end
+
+		table.insert(state_files, { id = e.id, label = label })
+	end
+
 	return state_files
 end
 
@@ -344,8 +281,11 @@ end
 ---@return table wezterm action
 function pub.delete_action(opts)
 	local delete_opts = utils.tbl_deep_extend("force", {
-		title = "Delete Session",
-		description = "Select a session to delete  (Enter = delete, Esc = cancel, / = filter)",
+		title = "Delete State",
+		description = "Select a state to delete   (Enter = delete, Esc = cancel, / = filter)",
+		-- Own prompt so the shared default doesn't say "restore" while deleting.
+		fuzzy_description = (wezterm.nerdfonts.md_backup_restore or "")
+			.. "  resurrect.wezterm · select state to delete: ",
 		is_fuzzy = true,
 	}, opts or {})
 	return wezterm.action_callback(function(win, pane)
