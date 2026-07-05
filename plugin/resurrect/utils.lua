@@ -140,6 +140,21 @@ function utils.last_row(text)
 	return text:match("[^\n]*$") or ""
 end
 
+---Split captured text into its rows, without their \r\n separators: {} for
+---empty text, so #split_rows(text) == count_text_rows(text).
+---@param text string
+---@return string[]
+function utils.split_rows(text)
+	local rows = {}
+	if text == "" then
+		return rows
+	end
+	for row in (text .. "\n"):gmatch("([^\n]*)\n") do
+		table.insert(rows, (row:gsub("\r$", "")))
+	end
+	return rows
+end
+
 ---Drop the last n rows and the newlines binding them; "" when n covers the
 ---whole text. Rows above the drop are preserved byte-identically, except
 ---that the \r left dangling by a dropped \r\n separator is removed too.

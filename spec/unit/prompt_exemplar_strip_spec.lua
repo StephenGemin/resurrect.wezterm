@@ -55,13 +55,22 @@ describe("capture-time trailing-prompt stripping (restore_baseline exemplar)", f
 		return pane
 	end
 
-	-- Run the settle snapshot scheduled by register(); the harness records
-	-- call_after callbacks instead of executing them on a timer.
-	local function settle()
+	-- The harness records call_after callbacks instead of executing them on a
+	-- timer, and each settle poll schedules the next until the pane settles.
+	-- settle_step fires one pending poll; settle drains the whole chain.
+	local function settle_step()
 		for _, call in ipairs(wz._rec.calls) do
-			if call.name == "call_after" then
+			if call.name == "call_after" and not call.done then
+				call.done = true
 				call.fn()
+				return true
 			end
+		end
+		return false
+	end
+
+	local function settle()
+		while settle_step() do
 		end
 	end
 
@@ -140,6 +149,69 @@ describe("capture-time trailing-prompt stripping (restore_baseline exemplar)", f
 		pane.content = busy
 		assert.are.equal(busy, capture(pane))
 	end)
+
+	it("does not strip when a command is running at save time", function()
+		local o = { process = ZSH }
+		local pane = make_pane(o)
+		tab_state.default_on_pane_restore({ pane = pane, text = "" })
+		pane.content = OMP_PROMPT
+		settle()
+		o.process = { name = "node", executable = "/usr/bin/node" }
+		local busy = "out\r\n" .. OMP_PROMPT
+		pane.content = busy
+		assert.are.equal(busy, capture(pane))
+	end)
+
+	it("learns the exemplar even when the prompt paints several polls late", function()
+		local pane = make_pane({ process = ZSH })
+		tab_state.default_on_pane_restore({ pane = pane, text = "" })
+		-- Cold-start contention: the pane stays blank through the first polls.
+		settle_step()
+		settle_step()
+		settle_step()
+		pane.content = OMP_PROMPT
+		settle()
+		local activity = "\226\157\175 ls\r\nout"
+		pane.content = activity .. "\r\n" .. OMP_PROMPT
+		assert.are.equal(activity, capture(pane))
+	end)
+
+	it("falls back to idle-only tracking when no prompt is ever observed", function()
+		local pane = make_pane({ process = ZSH, content = "make: done" })
+		tab_state.default_on_pane_restore({ pane = pane, text = "make: done" })
+		settle() -- drains the whole poll budget; the pane never grows
+		-- Idle saves still persist the replay byte-stably...
+		assert.are.equal("make: done", capture(pane))
+		-- ...but with no exemplar, a capture after activity keeps its tail.
+		pane.content = "make: done\r\nuser@host:~$"
+		assert.are.equal("make: done\r\nuser@host:~$", capture(pane))
+	end)
+
+	it("does not strip when another region row renders like the exemplar's final row", function()
+		local pane = make_pane({ process = ZSH })
+		tab_state.default_on_pane_restore({ pane = pane, text = "" })
+		pane.content = OMP_PROMPT
+		settle()
+		-- A transient-style leftover command row directly above the final
+		-- prompt-glyph row: stripping the measured two rows would eat it, so
+		-- the strip must decline and persist the capture unmodified.
+		local suspicious = "out\r\n\226\157\175 pwd\r\n\27[35m\226\157\175"
+		pane.content = suspicious
+		assert.are.equal(suspicious, capture(pane))
+	end)
+
+	it("never strips a reused pane's settle growth, but keeps it idle-stable", function()
+		local pane = make_pane({ process = ZSH })
+		tab_state.default_on_pane_restore({ pane = pane, text = "hello", reused_pane = true })
+		-- The already-running shell's own first prompt and the cd exchange
+		-- land around the replay in no clean single-prompt shape.
+		pane.content = "hello\r\n\226\157\175 cd /tmp\r\n" .. OMP_PROMPT
+		settle()
+		assert.are.equal("hello", capture(pane))
+		pane.content = pane.content .. "\r\nout"
+		local live = pane.content
+		assert.are.equal(live, capture(pane))
+	end)
 end)
 
 describe("utils capture-row helpers", function()
@@ -168,5 +240,10 @@ describe("utils capture-row helpers", function()
 		assert.are.equal(0, utils.count_text_rows(""))
 		assert.are.equal(1, utils.count_text_rows("a"))
 		assert.are.equal(3, utils.count_text_rows("a\r\nb\r\nc"))
+	end)
+
+	it("split_rows splits on row separators and returns {} for empty text", function()
+		assert.are.same({}, utils.split_rows(""))
+		assert.are.same({ "a", "", "c" }, utils.split_rows("a\r\n\r\nc"))
 	end)
 end)

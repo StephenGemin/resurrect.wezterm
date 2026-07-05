@@ -1,9 +1,9 @@
--- A restored pane replays its saved scrollback and the restore's "\r\n" makes
--- the shell print a fresh prompt, so a naive re-capture persists
+-- A restored pane replays its saved scrollback and the fresh shell then
+-- paints its own first prompt, so a naive re-capture persists
 -- [replay + fresh prompt] -- one extra prompt block per save->restore cycle,
--- forever. restore_baseline snapshots the pane once the fresh prompt has
--- painted and persists the replay byte-identically for as long as captures
--- still equal that snapshot. These specs pin the capture-side contract, whose
+-- forever. restore_baseline polls until the fresh prompt has painted and the
+-- pane is quiescent, then persists the replay byte-identically for as long
+-- as captures still equal that snapshot. These specs pin the capture-side contract, whose
 -- failure modes are all quiet: idle restored panes persist the replayed text
 -- byte-identical (compounding returns if not), any content change is captured
 -- live (data loss if not), and activity during the settle window must not be
@@ -48,15 +48,26 @@ describe("restored-pane idle check (restore_baseline)", function()
 		function pane.get_lines_as_escapes(_, _)
 			return pane.content
 		end
+		function pane.get_foreground_process_info(_)
+			return { name = "zsh", executable = "/bin/zsh" }
+		end
 		return pane
 	end
 
-	-- Run the settle snapshot scheduled by register(); the harness records
-	-- call_after callbacks instead of executing them on a timer.
+	-- Drain the settle poll chain scheduled by register(): the harness records
+	-- call_after callbacks instead of executing them on a timer, and each poll
+	-- schedules the next until the pane settles, so keep firing pending ones.
 	local function settle()
-		for _, call in ipairs(wz._rec.calls) do
-			if call.name == "call_after" then
-				call.fn()
+		local fired = true
+		while fired do
+			fired = false
+			for _, call in ipairs(wz._rec.calls) do
+				if call.name == "call_after" and not call.done then
+					call.done = true
+					call.fn()
+					fired = true
+					break
+				end
 			end
 		end
 	end

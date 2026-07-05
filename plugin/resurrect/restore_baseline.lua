@@ -5,19 +5,26 @@ local utils = require("resurrect.utils")
 -- freshly spawned shell then paints one genuinely new prompt below the
 -- replay. A later save that naively re-captures such a pane persists
 -- [replay + fresh prompt] -- one extra prompt block per save->restore cycle,
--- forever. This module remembers what was replayed into each restored pane,
--- snapshots the pane's rendered content once that fresh prompt has painted,
--- and uses the pair two ways:
+-- forever. This module polls each restored pane until that fresh prompt has
+-- painted and the pane is quiescent, then uses the snapshot two ways:
 --
 --  * idle detection: a capture still byte-identical to the snapshot proves
 --    the pane is untouched, so the replay is persisted as-is.
---  * prompt exemplar: whatever the snapshot holds beyond the rendered replay
---    is exactly what one organic prompt adds to this pane -- measured, never
---    pattern-matched, so it holds for any shell or prompt theme. Once the
---    pane sees real activity, live captures that still end in that measured
---    block get it stripped: persisted text stops where the live prompt
---    began, and the next restore's fresh shell completes the screen instead
---    of duplicating the prompt.
+--  * prompt exemplar: the rows the quiescent snapshot holds beyond the
+--    replayed text are exactly what one organic prompt adds to this pane --
+--    measured, never pattern-matched, so it holds for any shell or prompt
+--    theme. Once the pane sees real activity, live captures that still end
+--    in that measured block get it stripped: persisted text stops where the
+--    live prompt began, and the next restore's fresh shell completes the
+--    screen instead of duplicating the prompt.
+--
+-- The settle is a poll loop, not a fixed delay: under cold-start contention
+-- (a workspace spawning several shells at once) the first prompt can take
+-- many seconds to paint, and a fixed-delay snapshot taken before it lands
+-- both breaks idle detection and mismeasures the exemplar. The replay is
+-- compared per-row as plaintext, not bytes: injected bytes are re-encoded by
+-- the terminal, and the rendered rows survive that round trip while the
+-- escape bytes may not.
 --
 -- Every guard fails toward persisting the capture unmodified, so real
 -- activity can never be mistaken for idleness and content is never eaten.
@@ -29,23 +36,20 @@ local pub = {}
 ---@type {[integer]: {text: string?, snapshot: string?, prompt_rows: integer?, prompt_last_row: string?}}
 local _baselines = {}
 
--- How long after the restore's "\r\n" the fresh prompt is given to paint
--- before the settle snapshot is taken. Too early and the snapshot misses the
--- prompt (every later save then mismatches and captures live -- the old,
--- compounding behavior); there is no correctness risk in being generous.
-local SETTLE_DELAY_SECONDS = 1.0
+local SETTLE_POLL_SECONDS = 1.0
+local SETTLE_MAX_POLLS = 15
 
--- A settle snapshot may exceed the rendered replay by a fresh prompt block,
--- nothing more. Growth beyond this many rows means the user was already
--- active during the settle window; freezing that activity into the snapshot
--- would let a later idle save silently persist the pre-activity replay, so
--- the registration is dropped instead (normal captures from then on).
-local MAX_SETTLE_GROWTH_ROWS = 8
+-- An organic prompt block is at most this many rows. A quiescent suffix any
+-- larger means the user was already active during the settle window: learning
+-- it would over-strip later captures, and freezing it into the snapshot would
+-- let a later idle save silently persist the pre-activity replay, so the
+-- registration is dropped instead (normal captures from then on).
+local MAX_PROMPT_BLOCK_ROWS = 4
 
-local function count_rows(text)
-	local _, n = text:gsub("\n", "")
-	return n
-end
+-- A reused pane (see register's no_exemplar) legitimately grows by more than
+-- one prompt block: its already-running shell's first prompt plus the
+-- restore's cd exchange.
+local REUSED_PANE_MAX_GROWTH_ROWS = 8
 
 -- Entries for closed panes are unreachable (pane ids are never reused); drop
 -- them so long-running sessions with many restores don't accumulate dead
@@ -66,83 +70,6 @@ local function sweep()
 	end
 end
 
----Record the text just replayed into a restored pane (may be empty, for a
----pane restored with no replay). Call right after inject_output, before the
----shell has had a chance to paint; the settle snapshot that measures the
----organic first prompt is scheduled from here.
----@param pane Pane
----@param text string the exact replay text, without the positioning "\r\n"
-function pub.register(pane, text)
-	sweep()
-	-- Lazy require: pane_tree requires this module back, so a top-level
-	-- require would be circular.
-	local max_nlines = require("resurrect.pane_tree").max_nlines
-	local pane_id = pane:pane_id()
-	local entry = { text = text }
-	_baselines[pane_id] = entry
-	-- The replay as actually rendered in this pane: long lines re-wrap to the
-	-- new pane's width, so the snapshot growth bound must be measured against
-	-- this, not against the original text's row count.
-	local ok, rendered = pcall(utils.capture_pane_text, pane, max_nlines)
-	if not ok then
-		_baselines[pane_id] = nil
-		wezterm.log_info(("resurrect.restore_baseline: pane %d register capture failed, not tracking"):format(pane_id))
-		return
-	end
-	local rendered_rows = count_rows(rendered)
-	wezterm.log_info(
-		("resurrect.restore_baseline: pane %d registered replay (%d bytes, %d rendered rows)"):format(
-			pane_id,
-			#text,
-			rendered_rows
-		)
-	)
-	wezterm.time.call_after(SETTLE_DELAY_SECONDS, function()
-		if _baselines[pane_id] ~= entry then
-			return
-		end
-		-- pcall: the pane may have closed during the settle window.
-		local snap_ok, snapshot = pcall(utils.capture_pane_text, pane, max_nlines)
-		if not snap_ok then
-			_baselines[pane_id] = nil
-			wezterm.log_info(
-				("resurrect.restore_baseline: pane %d settle capture failed, not tracking"):format(pane_id)
-			)
-			return
-		end
-		local snapshot_rows = count_rows(snapshot)
-		if snapshot_rows > rendered_rows + MAX_SETTLE_GROWTH_ROWS then
-			_baselines[pane_id] = nil
-			wezterm.log_info(
-				("resurrect.restore_baseline: pane %d grew %d->%d rows during settle (activity), not tracking"):format(
-					pane_id,
-					rendered_rows,
-					snapshot_rows
-				)
-			)
-			return
-		end
-		entry.snapshot = snapshot
-		-- What this shell adds when it paints one prompt, measured rather
-		-- than pattern-matched: the row count to strip from a later capture,
-		-- and the final row's rendered text as the guard that such a capture
-		-- still ends in the same prompt block.
-		local prompt_rows = utils.count_text_rows(snapshot) - utils.count_text_rows(rendered)
-		local prompt_last_row = utils.row_plaintext(utils.last_row(snapshot))
-		if prompt_rows > 0 and prompt_rows <= MAX_SETTLE_GROWTH_ROWS and prompt_last_row ~= "" then
-			entry.prompt_rows = prompt_rows
-			entry.prompt_last_row = prompt_last_row
-		end
-		wezterm.log_info(
-			("resurrect.restore_baseline: pane %d settled (%d rows, prompt block: %s rows), idle saves will persist the replay"):format(
-				pane_id,
-				snapshot_rows,
-				entry.prompt_rows or "unmeasured"
-			)
-		)
-	end)
-end
-
 -- The pane sits at a live prompt only when its foreground process is the
 -- shell itself; under a running command the captured tail is real output.
 -- pcall: the process probe can fail on a pane mid-teardown.
@@ -158,13 +85,143 @@ local function at_shell_prompt(pane)
 	return utils.COMMON_SHELLS[utils.base_name_of(proc.name or proc.executable)] == true
 end
 
+---Record the text just replayed into a restored pane (may be empty, for a
+---pane restored with no replay), then poll until the pane's organic first
+---prompt has painted and the pane is quiescent. Call right after
+---inject_output.
+---@param pane Pane
+---@param text string the exact replay text, without the positioning "\r\n"
+---@param opts? {no_exemplar: boolean?} no_exemplar: the pane's shell was
+---already running when the replay was injected (the reused startup pane), so
+---its quiescent growth is not one clean prompt block; take the snapshot for
+---idle detection but never learn a strip exemplar from it.
+function pub.register(pane, text, opts)
+	sweep()
+	-- Lazy require: pane_tree requires this module back, so a top-level
+	-- require would be circular.
+	local max_nlines = require("resurrect.pane_tree").max_nlines
+	local no_exemplar = opts and opts.no_exemplar
+	local pane_id = pane:pane_id()
+	local entry = { text = text }
+	_baselines[pane_id] = entry
+	local text_plain = {}
+	for i, row in ipairs(utils.split_rows(text)) do
+		text_plain[i] = utils.row_plaintext(row)
+	end
+	wezterm.log_info(
+		("resurrect.restore_baseline: pane %d registered replay (%d bytes, %d rows)"):format(
+			pane_id,
+			#text,
+			#text_plain
+		)
+	)
+
+	local polls = 0
+	local previous_snapshot ---@type string?
+	local function poll()
+		if _baselines[pane_id] ~= entry then
+			return
+		end
+		polls = polls + 1
+		-- pcall: the pane may have closed during the settle window.
+		local snap_ok, snapshot = pcall(utils.capture_pane_text, pane, max_nlines)
+		if not snap_ok then
+			_baselines[pane_id] = nil
+			wezterm.log_info(("resurrect.restore_baseline: pane %d settle capture failed, not tracking"):format(pane_id))
+			return
+		end
+		local snap_rows = utils.split_rows(snapshot)
+		local growth = #snap_rows - #text_plain
+
+		if no_exemplar then
+			if growth > REUSED_PANE_MAX_GROWTH_ROWS then
+				_baselines[pane_id] = nil
+				wezterm.log_info(
+					("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
+				)
+				return
+			end
+			if snapshot == previous_snapshot and at_shell_prompt(pane) then
+				entry.snapshot = snapshot
+				wezterm.log_info(
+					("resurrect.restore_baseline: pane %d settled (%d rows, reused pane: idle saves only)"):format(
+						pane_id,
+						#snap_rows
+					)
+				)
+				return
+			end
+		else
+			local prefix_ok = growth >= 0
+			if prefix_ok then
+				for i = 1, #text_plain do
+					if utils.row_plaintext(snap_rows[i]) ~= text_plain[i] then
+						prefix_ok = false
+						break
+					end
+				end
+			end
+			if not prefix_ok or growth > MAX_PROMPT_BLOCK_ROWS then
+				_baselines[pane_id] = nil
+				wezterm.log_info(
+					("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
+				)
+				return
+			end
+			if growth > 0 and snapshot == previous_snapshot and at_shell_prompt(pane) then
+				entry.snapshot = snapshot
+				-- What this shell adds when it paints one prompt, measured
+				-- rather than pattern-matched: the row count to strip from a
+				-- later capture, and the final row's rendering as the guard
+				-- that such a capture still ends in the same prompt block.
+				local last_plain = utils.row_plaintext(snap_rows[#snap_rows])
+				if last_plain ~= "" then
+					entry.prompt_rows = growth
+					entry.prompt_last_row = last_plain
+				end
+				wezterm.log_info(
+					("resurrect.restore_baseline: pane %d settled (%d rows, prompt block: %s rows), idle saves will persist the replay"):format(
+						pane_id,
+						#snap_rows,
+						entry.prompt_rows or "unmeasured"
+					)
+				)
+				return
+			end
+		end
+
+		if polls >= SETTLE_MAX_POLLS then
+			-- Prompt never observed (or never went quiescent at a shell): keep
+			-- the last snapshot so idle byte-stability still works, but there
+			-- is no exemplar to vouch for stripping.
+			entry.snapshot = snapshot
+			wezterm.log_info(
+				("resurrect.restore_baseline: pane %d prompt block not observed after %ds; idle saves only"):format(
+					pane_id,
+					SETTLE_MAX_POLLS * SETTLE_POLL_SECONDS
+				)
+			)
+			return
+		end
+		previous_snapshot = snapshot
+		-- Keep event-driven saves from landing between polls: a capture taken
+		-- mid-settle would persist the replay with a half-painted prompt.
+		-- Lazy require, same cycle as above via pane_tree.
+		require("resurrect.state_manager").extend_save_suppression(SETTLE_POLL_SECONDS * 2)
+		wezterm.time.call_after(SETTLE_POLL_SECONDS, poll)
+	end
+	wezterm.time.call_after(SETTLE_POLL_SECONDS, poll)
+end
+
 ---Decide what to persist for a pane given its freshly captured content.
 ---Returns the originally replayed text when the capture proves the pane is
 ---untouched since restore (byte-identical to the settle snapshot). A capture
 ---that differs means real activity: it is persisted live, minus the trailing
 ---prompt block when the measured exemplar vouches for it -- the pane must be
----sitting at its shell prompt and the capture's final row must render as the
----settle snapshot's final row did; only then are exactly the measured rows
+---sitting at its shell prompt, the capture's final row must render as the
+---settle snapshot's final row did, and no other row in the strip region may
+---render like it (a region that swallowed more than one prompt paint means
+---the exemplar was mismeasured); only then are exactly the measured rows
 ---dropped. Any doubt persists the capture unmodified.
 ---@param pane Pane
 ---@param captured string the pane's current content as captured by pane_tree
@@ -199,10 +256,27 @@ function pub.text_to_persist(pane, captured)
 		_baselines[pane_id] = nil
 		return captured
 	end
-	if utils.row_plaintext(utils.last_row(captured)) ~= entry.prompt_last_row then
+	local captured_rows = utils.split_rows(captured)
+	if #captured_rows < entry.prompt_rows then
+		wezterm.log_info(
+			("resurrect.restore_baseline: pane %d strip declined: capture shorter than prompt block"):format(pane_id)
+		)
 		return captured
 	end
+	if utils.row_plaintext(captured_rows[#captured_rows]) ~= entry.prompt_last_row then
+		wezterm.log_info(("resurrect.restore_baseline: pane %d strip declined: final row mismatch"):format(pane_id))
+		return captured
+	end
+	for i = #captured_rows - entry.prompt_rows + 1, #captured_rows - 1 do
+		if utils.row_plaintext(captured_rows[i]):sub(1, #entry.prompt_last_row) == entry.prompt_last_row then
+			wezterm.log_info(
+				("resurrect.restore_baseline: pane %d strip declined: exemplar row repeats in region"):format(pane_id)
+			)
+			return captured
+		end
+	end
 	if not at_shell_prompt(pane) then
+		wezterm.log_info(("resurrect.restore_baseline: pane %d strip declined: not at shell prompt"):format(pane_id))
 		return captured
 	end
 	wezterm.log_info(

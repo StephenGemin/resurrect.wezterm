@@ -106,6 +106,12 @@ function pub.restore_tab(tab, tab_state, opts)
 	local ok, err = pcall(function()
 		if opts.pane then
 			tab_state.pane_tree.pane = opts.pane
+			-- This pane's shell was already running before the replay was
+			-- injected (its own first prompt and the cd exchange below
+			-- interleave with it), so restore_baseline must not learn a prompt
+			-- exemplar from its settle. Never persisted: get_tab_state rebuilds
+			-- trees from live panes, so the flag cannot leak into state files.
+			tab_state.pane_tree.reused_pane = true
 			-- Only needed when genuinely reusing an already-running pane (see
 			-- workspace_state.restore_workspace's active-pane reuse case). Panes spawned
 			-- fresh already have the right cwd from their spawn args; sending `cd` there
