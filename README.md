@@ -263,7 +263,7 @@ action = resurrect.fuzzy_loader.restore_action({
   relative        = true,
   restore_text    = true,
   on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
-  -- fuzzy_load_opts = { show_state_with_date = false },
+  -- fuzzy_load_opts = { show_state_with_date = true },
 })
 ```
 
@@ -419,7 +419,7 @@ end),
   fmt_workspace: fmt_fun,      -- format function for workspace state name
   fmt_tab: fmt_fun,            -- format function for tab state name
   fmt_date: fmt_fun,           -- format function for date
-  show_state_with_date: boolean, -- show last update of the state file, default: true
+  show_state_with_date: boolean, -- show last update of the state file, default: false
   date_format: string,         -- date formatting, default: "%Y-%m-%d %H:%M"
   ignore_screen_width: boolean,-- whether to shrink the list if the window is too narrow, default: true
   name_truncature: string,     -- string used when state name is truncated

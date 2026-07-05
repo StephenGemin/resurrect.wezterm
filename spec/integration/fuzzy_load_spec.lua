@@ -98,7 +98,7 @@ describe("fuzzy_load: file discovery", function()
 	end)
 end)
 
-describe("fuzzy_load: sorting, path parsing, and the encryption detail gate", function()
+describe("fuzzy_load: sorting and path parsing", function()
 	-- One "epoch path" line, letting each entry pick its own mtime.
 	local function line(epoch, type, name)
 		return epoch .. " " .. FAKE_DIR .. sep .. type .. sep .. name .. ".json"
@@ -134,39 +134,5 @@ describe("fuzzy_load: sorting, path parsing, and the encryption detail gate", fu
 		local choices = captured[1].arg.choices
 		assert.equals(1, #choices)
 		assert.equals("workspace" .. sep .. "my project.json", choices[1].id)
-	end)
-
-	it("shows the counts column for plaintext state files", function()
-		local fuzzy_loader = setup(make_stdout({ { type = "workspace", name = "proj" } }))
-		local file_io = require("resurrect.file_io")
-		file_io.load_json = function()
-			return { window_states = { { tabs = { {}, {} } } } }
-		end
-		local window, pane, captured = make_window()
-
-		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
-
-		-- "%dw" matches the workspace counts (e.g. "1w") without depending on the
-		-- exact format string or the multibyte separator.
-		local label = captured[1].arg.choices[1].label
-		assert.is_not_nil(label:match("%dw"), "expected a counts column in the label for a plaintext state")
-	end)
-
-	it("omits the counts column when encryption is enabled", function()
-		local fuzzy_loader = setup(make_stdout({ { type = "workspace", name = "proj" } }))
-		local file_io = require("resurrect.file_io")
-		-- Data is available on purpose: the encryption gate, not missing data,
-		-- must be what hides the counts (an encrypted file can't be parsed at
-		-- picker-open without a decrypt subprocess per file).
-		file_io.load_json = function()
-			return { window_states = { { tabs = { {}, {} } } } }
-		end
-		file_io.encryption.enable = true
-		local window, pane, captured = make_window()
-
-		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
-
-		local label = captured[1].arg.choices[1].label
-		assert.is_nil(label:match("%dw"), "encrypted states should not surface counts")
 	end)
 end)

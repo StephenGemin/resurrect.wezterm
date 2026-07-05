@@ -15,19 +15,15 @@ pub.default_fuzzy_load_opts = {
 	description = "Select State to Load and press Enter = accept, Esc = cancel, / = filter",
 	-- Branding lives on fuzzy_description, not description: with is_fuzzy = true the
 	-- picker opens straight into fuzzy mode and only the fuzzy_description is shown.
-	-- Bold is the only emphasis available -- InputSelector can't enlarge the header
-	-- font -- and only takes effect if the prompt honors wezterm.format escapes.
-	fuzzy_description = wezterm.format({
-		{ Attribute = { Intensity = "Bold" } },
-		{ Text = (wezterm.nerdfonts.md_backup_restore or "") .. "  resurrect.wezterm · select state to restore: " },
-	}),
+	fuzzy_description = (wezterm.nerdfonts.md_backup_restore or "")
+		.. "  resurrect.wezterm · select state to restore: ",
 	is_fuzzy = true,
 	ignore_workspaces = false,
 	ignore_windows = false,
 	ignore_tabs = false,
 	ignore_screen_width = true,
 	date_format = "%Y-%m-%d %H:%M",
-	show_state_with_date = true,
+	show_state_with_date = false,
 	name_truncature = " " .. wezterm.nerdfonts.cod_ellipsis .. "  ",
 	min_filename_size = 10,
 	fmt_date = function(date)
@@ -106,48 +102,13 @@ local function find_json_files_recursive(base_path)
 	end
 end
 
--- Number of panes in a saved pane_tree (children hang off .right / .bottom).
----@param node table|nil
----@return integer
-local function count_panes(node)
-	if not node then
-		return 0
-	end
-	return 1 + count_panes(node.right) + count_panes(node.bottom)
-end
-
--- Middle-column counts for one saved state, e.g. "3w·8t" / "5t" / "2p".
--- cwd was intentionally left out: it is variable-width and, in the default
--- content-width layout, a long path pushes the date off a narrow window.
--- Counts are bounded, so they never overflow.
----@param json table parsed state file
----@param type "workspace"|"window"|"tab"
----@return string
-local function summarize(json, type)
-	if type == "workspace" then
-		local wins = json.window_states or {}
-		local ntabs = 0
-		for _, w in ipairs(wins) do
-			ntabs = ntabs + (w.tabs and #w.tabs or 0)
-		end
-		return string.format("%dw·%dt", #wins, ntabs)
-	elseif type == "window" then
-		return string.format("%dt", #(json.tabs or {}))
-	else
-		return string.format("%dp", count_panes(json.pane_tree))
-	end
-end
-
 local COL_GAP = "  "
 
--- Build the InputSelector choice list from the finder output.
---
--- Layout is aligned in-row columns (InputSelector has no real multi-column API):
---   [<icon> name]  [counts + cwd]  [date]
--- The middle column is only built for plaintext states -- an encrypted state file
--- is opaque without a decrypt subprocess per file, so encrypted setups collapse to
--- a two-column [name] [date] layout rather than paying that cost at picker-open.
--- Within each type, entries are ordered newest-saved first.
+-- Build the InputSelector choice list from the finder output: one row per saved
+-- state, grouped workspace -> window -> tab and newest-saved first within each
+-- group. When show_state_with_date is set, a trailing date column is aligned by
+-- padding the single name column (InputSelector has no real multi-column API, so
+-- widths are hand-measured on escape-stripped text).
 ---@param stdout string|nil
 ---@param opts table
 ---@return table
@@ -157,25 +118,14 @@ local function insert_choices(stdout, opts)
 		return state_files
 	end
 
-	local file_io = require("resurrect.file_io")
-	local show_details = not file_io.encryption.enable
-
 	local types = { "workspace", "window", "tab" }
 	local files = { workspace = {}, window = {}, tab = {} }
 
-	-- Parse "<epoch> <fullpath>" lines. Keep the full path (already escaped on disk)
-	-- so the file can be re-read without reconstructing the name via get_file_path.
 	for line in stdout:gmatch("[^\n]+") do
-		local epoch, full = line:match("^%s*(%d+)%s+(.+)$")
-		local type, file
-		if full then
-			type, file = full:match("[/\\]([^/\\]+)[/\\]([^/\\]+%.json)$")
-		end
-		if epoch and full and type and file and files[type] and not opts[string.format("ignore_%ss", type)] then
+		local epoch, type, file = line:match("%s*(%d+)%s+.+[/\\]([^/\\]+)[/\\]([^/\\]+%.json)$")
+		if epoch and type and file and files[type] and not opts[string.format("ignore_%ss", type)] then
 			table.insert(files[type], {
 				id = type .. utils.separator .. file,
-				type = type,
-				path = full,
 				epoch = tonumber(epoch),
 				name = (file:gsub("%.json$", "")),
 				fmt = opts[string.format("fmt_%s", type)],
@@ -197,58 +147,44 @@ local function insert_choices(stdout, opts)
 		return state_files
 	end
 
-	-- Measure every entry's segments and the per-column max visible widths.
-	local name_max, mid_max = 0, 0
+	-- Measure each entry's visible name width; the date is a single trailing column.
+	local name_max = 0
 	for _, e in ipairs(ordered) do
 		e.name_w = utils.utf8len(utils.strip_format_esc_seq(e.fmt and e.fmt(e.name) or e.name))
 		name_max = math.max(name_max, e.name_w)
-
-		if show_details then
-			local json = file_io.load_json(e.path)
-			e.mid = json and summarize(json, e.type) or ""
-		else
-			e.mid = ""
-		end
-		mid_max = math.max(mid_max, utils.utf8len(e.mid))
-
 		e.date = opts.show_state_with_date and os.date(opts.date_format, e.epoch) or ""
 	end
 
-	-- Default (ignore_screen_width) pads to content widths. Otherwise cap to the
-	-- window and truncate names toward min_filename_size to fit.
-	if not opts.ignore_screen_width then
-		local gap = utils.utf8len(COL_GAP)
-		local date_w = ordered[1] and utils.utf8len(ordered[1].date) or 0
-		local total = name_max + gap + (show_details and mid_max > 0 and (mid_max + gap) or 0) + date_w
-		local available = utils.get_current_window_width() - 6
-		if total > available then
-			name_max = math.max(name_max - (total - available), opts.min_filename_size or 10)
+	-- With a date column and a fixed window, cap width and truncate names to fit.
+	if opts.show_state_with_date and not opts.ignore_screen_width then
+		local total = name_max + utils.utf8len(COL_GAP) + utils.utf8len(ordered[1].date)
+		local overflow = total - (utils.get_current_window_width() - 6)
+		if overflow > 0 then
+			name_max = math.max(name_max - overflow, opts.min_filename_size or 10)
 		end
 	end
 
 	for _, e in ipairs(ordered) do
-		-- Name column: truncate the plain name toward the min size, then color + pad.
 		local base = e.name
-		local prefix_w = e.name_w - utils.utf8len(base) -- constant "<icon> : " width
-		local target = name_max - prefix_w
-		if utils.utf8len(base) > target then
-			local pad = opts.name_truncature or "..."
-			local reduction = #base - math.max(target - utils.utf8len(pad), opts.min_filename_size or 10)
-			if reduction > 0 then
-				base = utils.replace_center(base, reduction, pad)
+		if e.date ~= "" then
+			-- Truncate the plain name toward the min size so the date column aligns.
+			local target = name_max - (e.name_w - utils.utf8len(base)) -- minus the "<icon> : " prefix
+			if utils.utf8len(base) > target then
+				local pad = opts.name_truncature or "..."
+				local reduction = #base - math.max(target - utils.utf8len(pad), opts.min_filename_size or 10)
+				if reduction > 0 then
+					base = utils.replace_center(base, reduction, pad)
+				end
 			end
 		end
-		local name_colored = e.fmt and e.fmt(base) or base
-		local name_vis = utils.utf8len(utils.strip_format_esc_seq(name_colored))
-		local label = name_colored .. string.rep(" ", math.max(name_max - name_vis, 0))
 
-		if show_details and mid_max > 0 then
-			-- Counts are right-justified so they sit flush against the date column.
-			label = label .. COL_GAP .. string.rep(" ", math.max(mid_max - utils.utf8len(e.mid), 0)) .. e.mid
-		end
-
+		local label = e.fmt and e.fmt(base) or base
 		if e.date ~= "" then
-			label = label .. COL_GAP .. (opts.fmt_date and opts.fmt_date(e.date) or e.date)
+			local name_vis = utils.utf8len(utils.strip_format_esc_seq(label))
+			label = label
+				.. string.rep(" ", math.max(name_max - name_vis, 0))
+				.. COL_GAP
+				.. (opts.fmt_date and opts.fmt_date(e.date) or e.date)
 		end
 
 		table.insert(state_files, { id = e.id, label = label })
@@ -348,10 +284,8 @@ function pub.delete_action(opts)
 		title = "Delete State",
 		description = "Select a state to delete   (Enter = delete, Esc = cancel, / = filter)",
 		-- Own prompt so the shared default doesn't say "restore" while deleting.
-		fuzzy_description = wezterm.format({
-			{ Attribute = { Intensity = "Bold" } },
-			{ Text = (wezterm.nerdfonts.md_backup_restore or "") .. "  resurrect.wezterm · select state to delete: " },
-		}),
+		fuzzy_description = (wezterm.nerdfonts.md_backup_restore or "")
+			.. "  resurrect.wezterm · select state to delete: ",
 		is_fuzzy = true,
 	}, opts or {})
 	return wezterm.action_callback(function(win, pane)
