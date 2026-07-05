@@ -220,52 +220,61 @@ function pub.register(pane, text, opts)
 
 		if not stability_only then
 			if growth < 0 or growth > MAX_PROMPT_BLOCK_ROWS then
-				_baselines[pane_id] = nil
-				wezterm.log_info(
-					("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
-				)
-				return
-			end
-			local prefix_ok = true
-			for i = 1, #text_plain do
-				local snap_plain = utils.row_plaintext(snap_rows[i])
-				if snap_plain ~= text_plain[i] then
-					dbg(
-						"pane %d prefix mismatch at row %d: %q vs replay %q",
-						pane_id,
-						i,
-						snap_plain:sub(1, 60),
-						text_plain[i]:sub(1, 60)
+				-- A lone bad-growth frame is not proof of activity: a poll can
+				-- catch the first prompt mid-paint, with the replay's final row
+				-- cleared and trimmed from the capture (transient negative
+				-- growth). Only a snapshot that held for a full poll interval
+				-- convicts; otherwise keep polling.
+				if stable then
+					_baselines[pane_id] = nil
+					wezterm.log_info(
+						("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
 					)
-					prefix_ok = false
-					break
+					return
 				end
-			end
-			if not prefix_ok then
-				-- Typing edits a pane's tail, so a prefix mismatch at benign
-				-- growth is the replay re-rendering, not user activity;
-				-- dropping to live captures here would re-grow the state
-				-- file on every save.
-				stability_only = true
-			elseif growth > 0 and stable and at_prompt then
-				entry.snapshot = snapshot
-				-- What this shell adds when it paints one prompt, measured
-				-- rather than pattern-matched: the row count to strip from a
-				-- later capture, and the final row's rendering as the guard
-				-- that such a capture still ends in the same prompt block.
-				local last_plain = utils.row_plaintext(snap_rows[#snap_rows])
-				if last_plain ~= "" then
-					entry.prompt_rows = growth
-					entry.prompt_last_row = last_plain
+				dbg("pane %d growth %d out of range but unstable, polling on", pane_id, growth)
+			else
+				local prefix_ok = true
+				for i = 1, #text_plain do
+					local snap_plain = utils.row_plaintext(snap_rows[i])
+					if snap_plain ~= text_plain[i] then
+						dbg(
+							"pane %d prefix mismatch at row %d: %q vs replay %q",
+							pane_id,
+							i,
+							snap_plain:sub(1, 60),
+							text_plain[i]:sub(1, 60)
+						)
+						prefix_ok = false
+						break
+					end
 				end
-				wezterm.log_info(
-					("resurrect.restore_baseline: pane %d settled (%d rows, prompt block: %s rows), idle saves will persist the replay"):format(
-						pane_id,
-						#snap_rows,
-						entry.prompt_rows or "unmeasured"
+				if not prefix_ok then
+					-- Typing edits a pane's tail, so a prefix mismatch at benign
+					-- growth is the replay re-rendering, not user activity;
+					-- dropping to live captures here would re-grow the state
+					-- file on every save.
+					stability_only = true
+				elseif growth > 0 and stable and at_prompt then
+					entry.snapshot = snapshot
+					-- What this shell adds when it paints one prompt, measured
+					-- rather than pattern-matched: the row count to strip from a
+					-- later capture, and the final row's rendering as the guard
+					-- that such a capture still ends in the same prompt block.
+					local last_plain = utils.row_plaintext(snap_rows[#snap_rows])
+					if last_plain ~= "" then
+						entry.prompt_rows = growth
+						entry.prompt_last_row = last_plain
+					end
+					wezterm.log_info(
+						("resurrect.restore_baseline: pane %d settled (%d rows, prompt block: %s rows), idle saves will persist the replay"):format(
+							pane_id,
+							#snap_rows,
+							entry.prompt_rows or "unmeasured"
+						)
 					)
-				)
-				return
+					return
+				end
 			end
 		end
 
