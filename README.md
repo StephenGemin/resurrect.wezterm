@@ -263,7 +263,7 @@ action = resurrect.fuzzy_loader.restore_action({
   relative        = true,
   restore_text    = true,
   on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
-  -- fuzzy_load_opts = { show_state_with_date = true },
+  -- fuzzy_load_opts = { show_state_with_date = false },
 })
 ```
 
@@ -410,7 +410,7 @@ end),
 ---@alias fuzzy_load_opts {
   title: string,               -- dialog title, default: "Load state"
   description: string,         -- description shown above the picker, default: "Select State to Load and press Enter = accept, Esc = cancel, / = filter"
-  fuzzy_description: string,   -- description in fuzzy search mode, default: "Search State to Load: "
+  fuzzy_description: string,   -- prompt shown in fuzzy mode; default: a nerdfonts.md_backup_restore glyph + "resurrect.wezterm · select state to restore: "
   is_fuzzy: boolean,           -- enter directly in fuzzy mode, default: true
   ignore_workspaces: boolean,  -- hide workspace entries, default: false
   ignore_tabs: boolean,        -- hide tab entries, default: false
@@ -419,8 +419,8 @@ end),
   fmt_workspace: fmt_fun,      -- format function for workspace state name
   fmt_tab: fmt_fun,            -- format function for tab state name
   fmt_date: fmt_fun,           -- format function for date
-  show_state_with_date: boolean, -- show last update of the state file, default: false
-  date_format: string,         -- date formatting, default: "%d-%m-%Y %H:%M:%S"
+  show_state_with_date: boolean, -- show last update of the state file, default: true
+  date_format: string,         -- date formatting, default: "%Y-%m-%d %H:%M"
   ignore_screen_width: boolean,-- whether to shrink the list if the window is too narrow, default: true
   name_truncature: string,     -- string used when state name is truncated
   min_filename_size: number    -- minimum size of state name before truncation

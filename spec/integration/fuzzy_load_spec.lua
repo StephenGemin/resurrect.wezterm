@@ -97,3 +97,76 @@ describe("fuzzy_load: file discovery", function()
 		assert.is_true(ids["tab" .. sep .. "mytab.json"])
 	end)
 end)
+
+describe("fuzzy_load: sorting, path parsing, and the encryption detail gate", function()
+	-- One "epoch path" line, letting each entry pick its own mtime.
+	local function line(epoch, type, name)
+		return epoch .. " " .. FAKE_DIR .. sep .. type .. sep .. name .. ".json"
+	end
+
+	it("orders entries newest-first within a type", function()
+		local stdout = table.concat({
+			line(1000000100, "workspace", "older"),
+			line(1000000300, "workspace", "newest"),
+			line(1000000200, "workspace", "middle"),
+		}, "\n") .. "\n"
+		local fuzzy_loader = setup(stdout)
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		local choices = captured[1].arg.choices
+		assert.equals("workspace" .. sep .. "newest.json", choices[1].id)
+		assert.equals("workspace" .. sep .. "middle.json", choices[2].id)
+		assert.equals("workspace" .. sep .. "older.json", choices[3].id)
+	end)
+
+	it("keeps spaces in the path when building the choice id", function()
+		-- Mirrors the real macOS state dir: a space in a directory ("Application
+		-- Support") and in the state name. The greedy full-path capture must keep
+		-- the row rather than silently dropping it.
+		local spaced = "/tmp/App Support/wezterm/workspace/my project.json"
+		local fuzzy_loader = setup("1000000000 " .. spaced .. "\n")
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		local choices = captured[1].arg.choices
+		assert.equals(1, #choices)
+		assert.equals("workspace" .. sep .. "my project.json", choices[1].id)
+	end)
+
+	it("shows the counts column for plaintext state files", function()
+		local fuzzy_loader = setup(make_stdout({ { type = "workspace", name = "proj" } }))
+		local file_io = require("resurrect.file_io")
+		file_io.load_json = function()
+			return { window_states = { { tabs = { {}, {} } } } }
+		end
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		-- "%dw" matches the workspace counts (e.g. "1w") without depending on the
+		-- exact format string or the multibyte separator.
+		local label = captured[1].arg.choices[1].label
+		assert.is_not_nil(label:match("%dw"), "expected a counts column in the label for a plaintext state")
+	end)
+
+	it("omits the counts column when encryption is enabled", function()
+		local fuzzy_loader = setup(make_stdout({ { type = "workspace", name = "proj" } }))
+		local file_io = require("resurrect.file_io")
+		-- Data is available on purpose: the encryption gate, not missing data,
+		-- must be what hides the counts (an encrypted file can't be parsed at
+		-- picker-open without a decrypt subprocess per file).
+		file_io.load_json = function()
+			return { window_states = { { tabs = { {}, {} } } } }
+		end
+		file_io.encryption.enable = true
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		local label = captured[1].arg.choices[1].label
+		assert.is_nil(label:match("%dw"), "encrypted states should not surface counts")
+	end)
+end)
