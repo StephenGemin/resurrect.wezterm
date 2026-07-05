@@ -121,24 +121,6 @@ local function sanitize_immutable_store_paths(process_info)
 	process_info.argv = argv
 end
 
----Extract the lowercased base command name from a process name/path,
----stripping any directory prefix and a Windows .exe suffix.
----@param proc_name string|nil
----@return string
-local function base_name_of(proc_name)
-	proc_name = proc_name or ""
-	local base_name = proc_name:match("[/\\]?([^/\\]+)$") or proc_name
-	return base_name:gsub("%.exe$", ""):lower()
-end
-
--- Shells that can legitimately hold the foreground-process slot for an
--- instant after a short-lived alt-screen program (e.g. `man`'s pager) exits:
--- is_alt_screen_active() can still read true while get_foreground_process_info()
--- has already moved on to the shell that regained the pty. Falling through to
--- text capture instead of persisting "restore the shell" is always safe here.
-local COMMON_SHELLS =
-	{ bash = true, zsh = true, sh = true, dash = true, fish = true, ksh = true, tcsh = true, csh = true }
-
 ---@param root pane_tree | nil
 ---@param panes PaneInformation[]
 ---@return pane_tree | nil
@@ -189,10 +171,14 @@ local function insert_panes(root, panes)
 
 			-- process_info can be nil even when alt_screen_active is true (observed
 			-- with `top`), and it can be stale -- a shell that already regained the
-			-- pty from a short-lived alt-screen program while is_alt_screen_active()
-			-- still reads true from a moment earlier. Both fall through to text
-			-- capture rather than persisting a bogus/missing process or crashing.
-			if process_info and not COMMON_SHELLS[base_name_of(process_info.name or process_info.executable or "")] then
+			-- pty from a short-lived alt-screen program (e.g. `man`'s pager) while
+			-- is_alt_screen_active() still reads true from a moment earlier. Both
+			-- fall through to text capture rather than persisting a bogus/missing
+			-- process or crashing.
+			if
+				process_info
+				and not utils.COMMON_SHELLS[utils.base_name_of(process_info.name or process_info.executable or "")]
+			then
 				process_info.children = nil
 				process_info.pid = nil
 				process_info.ppid = nil
@@ -207,10 +193,11 @@ local function insert_panes(root, panes)
 				root.alt_screen_active = false
 
 				-- A restored pane that is untouched since restore keeps its
-				-- replayed baseline byte-identical; persisting the capture
-				-- would also pick up the fresh prompt the restore triggered
-				-- and grow the saved state by one prompt block per
-				-- save->restore cycle.
+				-- replayed baseline byte-identical; an active pane's capture
+				-- has its trailing live prompt block stripped when the
+				-- measured exemplar vouches for it. Either way the persisted
+				-- text never ends in a prompt the next restore's fresh shell
+				-- would duplicate, so save->restore cycles cannot grow it.
 				local captured = utils.capture_pane_text(root.pane, pub.max_nlines)
 				root.text = restore_baseline.text_to_persist(root.pane, captured)
 			end
@@ -338,7 +325,7 @@ function pub.default_on_pane_restore(pane_tree)
 
 	-- Spawn process if using alt screen, otherwise restore text
 	if pane_tree.alt_screen_active and pane_tree.process and pane_tree.process.argv then
-		local base_name = base_name_of(pane_tree.process.name)
+		local base_name = utils.base_name_of(pane_tree.process.name)
 
 		if SAFE_RESTORE_PROCESSES[base_name] then
 			local cmd = wezterm.shell_join_args(pane_tree.process.argv) .. "\r\n"

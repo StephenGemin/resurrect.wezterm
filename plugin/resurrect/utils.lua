@@ -99,6 +99,96 @@ function utils.capture_pane_text(pane, max_nlines)
 	return utils.strip_trailing_blank_rows(pane:get_lines_as_escapes(nlines))
 end
 
+---Remove every escape sequence (CSI, OSC with either terminator, and
+---intermediate-byte sequences such as the ESC ( B charset designation)
+---anywhere in the string -- strip_format_esc_seq only handles SGR. Used to
+---compare what captured rows render as, independent of coloring.
+---@param str string
+---@return string
+function utils.strip_esc_seqs(str)
+	local s = str:gsub(ESC .. "%[[^@-~]*[@-~]", "")
+	s = s:gsub(ESC .. "%][^" .. BEL .. ESC .. "]*" .. BEL, "")
+	s = s:gsub(ESC .. "%][^" .. BEL .. ESC .. "]*" .. ESC .. "\\", "")
+	s = s:gsub(ESC .. "[ -/]+[0-~]", "")
+	return s
+end
+
+---What a captured row renders as: escape sequences removed and surrounding
+---whitespace (including any \r) trimmed.
+---@param row string
+---@return string
+function utils.row_plaintext(row)
+	return (utils.strip_esc_seqs(row):gsub("^%s*(.-)%s*$", "%1"))
+end
+
+---Number of rows in captured text: 0 for empty text, newline count + 1
+---otherwise, so appending one row always increases the count by one.
+---@param text string
+---@return integer
+function utils.count_text_rows(text)
+	if text == "" then
+		return 0
+	end
+	local _, n = text:gsub("\n", "")
+	return n + 1
+end
+
+---The final row of captured text (everything after the last newline).
+---@param text string
+---@return string
+function utils.last_row(text)
+	return text:match("[^\n]*$") or ""
+end
+
+---Drop the last n rows and the newlines binding them; "" when n covers the
+---whole text. Rows above the drop are preserved byte-identically, except
+---that the \r left dangling by a dropped \r\n separator is removed too.
+---@param text string
+---@param n integer
+---@return string
+function utils.strip_last_rows(text, n)
+	for _ = 1, n do
+		local without = text:match("^(.*)\n[^\n]*$")
+		if not without then
+			return ""
+		end
+		text = without
+	end
+	return (text:gsub("\r$", ""))
+end
+
+---Extract the lowercased base command name from a process name/path,
+---stripping any directory prefix and a Windows .exe suffix.
+---@param proc_name string|nil
+---@return string
+function utils.base_name_of(proc_name)
+	proc_name = proc_name or ""
+	local base_name = proc_name:match("[/\\]?([^/\\]+)$") or proc_name
+	return base_name:gsub("%.exe$", ""):lower()
+end
+
+-- Shells whose presence in the foreground-process slot means the pane is
+-- sitting at (or momentarily back at) its prompt. Used two ways: a stale
+-- alt-screen read that reports one of these has already handed the pty back
+-- to the shell (fall through to text capture instead of persisting a bogus
+-- process), and a text capture whose foreground process is one of these ends
+-- in a live prompt block that a restore's fresh shell will repaint (safe for
+-- restore_baseline to strip).
+utils.COMMON_SHELLS = {
+	bash = true,
+	zsh = true,
+	sh = true,
+	dash = true,
+	fish = true,
+	ksh = true,
+	tcsh = true,
+	csh = true,
+	pwsh = true,
+	powershell = true,
+	cmd = true,
+	nu = true,
+}
+
 -- getting screen dimensions
 ---@return number
 function utils.get_current_window_width()

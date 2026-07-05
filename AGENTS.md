@@ -26,8 +26,10 @@ plugin/
     tab_state.lua            get_tab_state(), restore_tab(), save_tab_action()
     pane_tree.lua            binary-tree representation of pane splits; fold/map;
                              default_on_pane_restore() + safe-restore-process allowlist
-    restore_baseline.lua     per-pane replayed-text registry + settle-snapshot idle
-                             check, so saves don't re-capture (and grow) idle restored panes
+    restore_baseline.lua     per-pane replayed-text registry, settle-snapshot idle check,
+                             and measured prompt-block exemplar -- saves neither re-capture
+                             idle restored panes nor persist a trailing live prompt that
+                             the next restore's fresh shell would duplicate
     utils.lua                platform detection, string helpers, ensure_folder_exists
     fuzzy_loader.lua         fuzzy-finder UI for picking a saved state to load
 spec/
