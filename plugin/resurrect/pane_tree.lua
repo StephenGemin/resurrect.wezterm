@@ -367,10 +367,20 @@ function pub.default_on_pane_restore(pane_tree)
 		-- Kept as a defensive pass for state files saved before capture-time
 		-- trimming existed; a no-op for freshly saved state.
 		local text = utils.strip_trailing_blank_rows(pane_tree.text)
-		pane:inject_output(text)
+		if #text > 0 then
+			-- The trailing "\r\n" is replayed as output so the shell's own first
+			-- prompt paints at column 0 of the row below the replay. Nothing may
+			-- be written to the shell's stdin here: a synthetic Enter makes the
+			-- line editor accept an empty line once it comes up, which prints a
+			-- second prompt and, under in-place prompt rewriters such as
+			-- oh-my-posh transient prompts, redraws over the replayed rows.
+			pane:inject_output(text .. "\r\n")
+		end
+		-- Register even when the replay is empty: the settle snapshot then
+		-- measures exactly what one organic prompt adds to a virgin pane, and
+		-- idle saves keep persisting the empty replay instead of re-capturing
+		-- that prompt.
 		restore_baseline.register(pane, text)
-		-- Send newline to trigger a fresh shell prompt at the correct position
-		pane:send_text("\r\n")
 	end
 end
 
