@@ -26,6 +26,13 @@ local utils = require("resurrect.utils")
 -- the terminal, and the rendered rows survive that round trip while the
 -- escape bytes may not.
 --
+-- Two settle situations cannot be measured by growth alone and fall back to
+-- idle-stability tracking: the genuinely reused pane (an already-running
+-- shell absorbs the replay, so its exemplar is instead anchored to the echo
+-- of the `cd` command this plugin itself sent there) and a pane whose
+-- replayed prefix stops matching at prompt-sized growth (the re-rendered
+-- replay cannot be row-attributed, so nothing vouches for a strip).
+--
 -- Every guard fails toward persisting the capture unmodified, so real
 -- activity can never be mistaken for idleness and content is never eaten.
 -- (OSC 133 semantic zones were tried first and are unreliable on wezterm
@@ -50,6 +57,32 @@ local MAX_PROMPT_BLOCK_ROWS = 4
 -- one prompt block: its already-running shell's first prompt plus the
 -- restore's cd exchange.
 local REUSED_PANE_MAX_GROWTH_ROWS = 8
+
+-- Temporary diagnostic firehose (grep "resurrect.debug:"). Remove or flip
+-- off before this branch is finalized.
+local DEBUG = true
+
+local function dbg(fmt, ...)
+	if DEBUG then
+		wezterm.log_info("resurrect.debug: " .. fmt:format(...))
+	end
+end
+
+---The last n of rows, rendered as "index=plaintext" pairs for log lines.
+---@param rows string[]
+---@param n integer
+---@return string
+local function tail_dump(rows, n)
+	local parts = {}
+	for i = math.max(1, #rows - n + 1), #rows do
+		local plain = utils.row_plaintext(rows[i])
+		if #plain > 60 then
+			plain = plain:sub(1, 60) .. "..."
+		end
+		parts[#parts + 1] = ("%d=%q"):format(i, plain)
+	end
+	return table.concat(parts, " ")
+end
 
 -- Entries for closed panes are unreachable (pane ids are never reused); drop
 -- them so long-running sessions with many restores don't accumulate dead
@@ -91,21 +124,25 @@ end
 ---inject_output.
 ---@param pane Pane
 ---@param text string the exact replay text, without the positioning "\r\n"
----@param opts? {no_exemplar: boolean?} no_exemplar: the pane's shell was
----already running when the replay was injected (the reused startup pane), so
----its quiescent growth is not one clean prompt block; take the snapshot for
----idle detection but never learn a strip exemplar from it.
+---@param opts? {no_exemplar: boolean?, cd_marker: string?} no_exemplar: the
+---pane's shell was already running when the replay was injected (the reused
+---active pane), so its quiescent growth is not one clean prompt block; take
+---the snapshot for idle detection only. cd_marker: the exact `cd` command
+---sent to that reused pane -- its echo anchors where the fresh prompt block
+---begins, letting even the reused pane learn a strip exemplar.
 function pub.register(pane, text, opts)
 	sweep()
 	-- Lazy require: pane_tree requires this module back, so a top-level
 	-- require would be circular.
 	local max_nlines = require("resurrect.pane_tree").max_nlines
 	local no_exemplar = opts and opts.no_exemplar
+	local cd_marker = opts and opts.cd_marker
 	local pane_id = pane:pane_id()
 	local entry = { text = text }
 	_baselines[pane_id] = entry
+	local text_rows = utils.split_rows(text)
 	local text_plain = {}
-	for i, row in ipairs(utils.split_rows(text)) do
+	for i, row in ipairs(text_rows) do
 		text_plain[i] = utils.row_plaintext(row)
 	end
 	wezterm.log_info(
@@ -115,9 +152,45 @@ function pub.register(pane, text, opts)
 			#text_plain
 		)
 	)
+	dbg("pane %d replay tail: %s", pane_id, tail_dump(text_rows, 6))
+
+	-- The reused pane's fresh prompt block starts right below the echo of the
+	-- cd this plugin sent it; find that echo (our own token, plain-matched so
+	-- paths with pattern chars can't misfire) in the bottom rows and measure
+	-- what the shell painted after it. A wrapped echo, a duplicate match, or
+	-- a blank final row declines -- snapshot-only tracking, as before.
+	local function exemplar_from_marker(snap_rows)
+		if not cd_marker then
+			return
+		end
+		local marker_idx
+		for i = math.max(1, #snap_rows - MAX_PROMPT_BLOCK_ROWS), #snap_rows do
+			if utils.row_plaintext(snap_rows[i]):find(cd_marker, 1, true) then
+				if marker_idx then
+					dbg("pane %d cd marker on rows %d and %d, ambiguous, not learning", pane_id, marker_idx, i)
+					return
+				end
+				marker_idx = i
+			end
+		end
+		if not marker_idx or marker_idx == #snap_rows then
+			dbg("pane %d cd marker %s, not learning", pane_id, marker_idx and "on final row" or "not in bottom rows")
+			return
+		end
+		local last_plain = utils.row_plaintext(snap_rows[#snap_rows])
+		if last_plain == "" then
+			return
+		end
+		entry.prompt_rows = #snap_rows - marker_idx
+		entry.prompt_last_row = last_plain
+	end
 
 	local polls = 0
 	local previous_snapshot ---@type string?
+	-- Flipped when the replayed prefix stops matching at prompt-sized growth:
+	-- the re-rendered replay can't be row-attributed, so no exemplar -- but
+	-- idle byte-stability still holds, which is what stops per-cycle growth.
+	local stability_only = no_exemplar
 	local function poll()
 		if _baselines[pane_id] ~= entry then
 			return
@@ -132,43 +205,49 @@ function pub.register(pane, text, opts)
 		end
 		local snap_rows = utils.split_rows(snapshot)
 		local growth = #snap_rows - #text_plain
+		local stable = snapshot == previous_snapshot
+		local at_prompt = at_shell_prompt(pane)
+		dbg(
+			"pane %d poll %d: %d rows, growth %d, stable %s, at_prompt %s, tail: %s",
+			pane_id,
+			polls,
+			#snap_rows,
+			growth,
+			tostring(stable),
+			tostring(at_prompt),
+			tail_dump(snap_rows, 6)
+		)
 
-		if no_exemplar then
-			if growth > REUSED_PANE_MAX_GROWTH_ROWS then
+		if not stability_only then
+			if growth < 0 or growth > MAX_PROMPT_BLOCK_ROWS then
 				_baselines[pane_id] = nil
 				wezterm.log_info(
 					("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
 				)
 				return
 			end
-			if snapshot == previous_snapshot and at_shell_prompt(pane) then
-				entry.snapshot = snapshot
-				wezterm.log_info(
-					("resurrect.restore_baseline: pane %d settled (%d rows, reused pane: idle saves only)"):format(
+			local prefix_ok = true
+			for i = 1, #text_plain do
+				local snap_plain = utils.row_plaintext(snap_rows[i])
+				if snap_plain ~= text_plain[i] then
+					dbg(
+						"pane %d prefix mismatch at row %d: %q vs replay %q",
 						pane_id,
-						#snap_rows
+						i,
+						snap_plain:sub(1, 60),
+						text_plain[i]:sub(1, 60)
 					)
-				)
-				return
-			end
-		else
-			local prefix_ok = growth >= 0
-			if prefix_ok then
-				for i = 1, #text_plain do
-					if utils.row_plaintext(snap_rows[i]) ~= text_plain[i] then
-						prefix_ok = false
-						break
-					end
+					prefix_ok = false
+					break
 				end
 			end
-			if not prefix_ok or growth > MAX_PROMPT_BLOCK_ROWS then
-				_baselines[pane_id] = nil
-				wezterm.log_info(
-					("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
-				)
-				return
-			end
-			if growth > 0 and snapshot == previous_snapshot and at_shell_prompt(pane) then
+			if not prefix_ok then
+				-- Typing edits a pane's tail, so a prefix mismatch at benign
+				-- growth is the replay re-rendering, not user activity;
+				-- dropping to live captures here would re-grow the state
+				-- file on every save.
+				stability_only = true
+			elseif growth > 0 and stable and at_prompt then
 				entry.snapshot = snapshot
 				-- What this shell adds when it paints one prompt, measured
 				-- rather than pattern-matched: the row count to strip from a
@@ -185,6 +264,34 @@ function pub.register(pane, text, opts)
 						#snap_rows,
 						entry.prompt_rows or "unmeasured"
 					)
+				)
+				return
+			end
+		end
+
+		if stability_only then
+			if growth > REUSED_PANE_MAX_GROWTH_ROWS then
+				_baselines[pane_id] = nil
+				wezterm.log_info(
+					("resurrect.restore_baseline: pane %d activity during settle, not tracking"):format(pane_id)
+				)
+				return
+			end
+			if stable and at_prompt then
+				entry.snapshot = snapshot
+				exemplar_from_marker(snap_rows)
+				local how
+				if entry.prompt_rows then
+					how = ("prompt block: %d rows via cd marker), idle saves will persist the replay"):format(
+						entry.prompt_rows
+					)
+				elseif no_exemplar then
+					how = "reused pane: idle saves only)"
+				else
+					how = "replay prefix not intact: idle saves only)"
+				end
+				wezterm.log_info(
+					("resurrect.restore_baseline: pane %d settled (%d rows, %s"):format(pane_id, #snap_rows, how)
 				)
 				return
 			end
@@ -232,6 +339,14 @@ function pub.text_to_persist(pane, captured)
 	if not entry then
 		return captured
 	end
+	dbg(
+		"pane %d text_to_persist: text=%s snapshot=%s prompt_rows=%s, captured %d bytes",
+		pane_id,
+		tostring(entry.text ~= nil),
+		tostring(entry.snapshot ~= nil),
+		tostring(entry.prompt_rows),
+		#captured
+	)
 	if entry.snapshot then
 		if captured == entry.snapshot then
 			wezterm.log_info(("resurrect.restore_baseline: pane %d idle, persisting replay"):format(pane_id))
@@ -263,8 +378,10 @@ function pub.text_to_persist(pane, captured)
 		)
 		return captured
 	end
-	if utils.row_plaintext(captured_rows[#captured_rows]) ~= entry.prompt_last_row then
+	local captured_last = utils.row_plaintext(captured_rows[#captured_rows])
+	if captured_last ~= entry.prompt_last_row then
 		wezterm.log_info(("resurrect.restore_baseline: pane %d strip declined: final row mismatch"):format(pane_id))
+		dbg("pane %d final row %q vs exemplar %q", pane_id, captured_last:sub(1, 60), entry.prompt_last_row:sub(1, 60))
 		return captured
 	end
 	for i = #captured_rows - entry.prompt_rows + 1, #captured_rows - 1 do
@@ -285,6 +402,7 @@ function pub.text_to_persist(pane, captured)
 			entry.prompt_rows
 		)
 	)
+	dbg("pane %d stripping rows: %s", pane_id, tail_dump(captured_rows, entry.prompt_rows))
 	return utils.strip_last_rows(captured, entry.prompt_rows)
 end
 

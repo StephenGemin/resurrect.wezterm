@@ -372,7 +372,10 @@ function pub.default_on_pane_restore(pane_tree)
 		-- measures exactly what one organic prompt adds to a virgin pane, and
 		-- idle saves keep persisting the empty replay instead of re-capturing
 		-- that prompt.
-		restore_baseline.register(pane, text, { no_exemplar = pane_tree.reused_pane })
+		restore_baseline.register(pane, text, {
+			no_exemplar = pane_tree.reused_pane,
+			cd_marker = pane_tree.cd_marker,
+		})
 	end
 end
 

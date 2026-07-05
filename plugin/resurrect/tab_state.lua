@@ -106,19 +106,24 @@ function pub.restore_tab(tab, tab_state, opts)
 	local ok, err = pcall(function()
 		if opts.pane then
 			tab_state.pane_tree.pane = opts.pane
-			-- This pane's shell was already running before the replay was
-			-- injected (its own first prompt and the cd exchange below
-			-- interleave with it), so restore_baseline must not learn a prompt
-			-- exemplar from its settle. Never persisted: get_tab_state rebuilds
-			-- trees from live panes, so the flag cannot leak into state files.
-			tab_state.pane_tree.reused_pane = true
-			-- Only needed when genuinely reusing an already-running pane (see
-			-- workspace_state.restore_workspace's active-pane reuse case). Panes spawned
-			-- fresh already have the right cwd from their spawn args; sending `cd` there
-			-- is a redundant command that ends up baked into scrollback and gets
-			-- replayed + re-saved on every future restore.
-			if opts.pane_needs_cd and tab_state.pane_tree.cwd and tab_state.pane_tree.cwd ~= "" then
-				opts.pane:send_text("cd " .. wezterm.shell_join_args({ tab_state.pane_tree.cwd }) .. "\r\n")
+			-- Only the genuinely reused pane (workspace_state's active-pane
+			-- reuse, flagged by pane_needs_cd) had a shell running before the
+			-- replay was injected -- its prompt and the cd exchange below
+			-- interleave with the replay, so restore_baseline must not learn a
+			-- prompt exemplar from a prefix match there. Roots that arrive via
+			-- opts.pane from spawn_tab/spawn_window are fresh shells with the
+			-- right cwd from their spawn args and learn exemplars normally.
+			-- The cd command is recorded as a marker so restore_baseline can
+			-- still measure the prompt block painted below its echo. Never
+			-- persisted: get_tab_state rebuilds trees from live panes, so
+			-- these flags cannot leak into state files.
+			if opts.pane_needs_cd then
+				tab_state.pane_tree.reused_pane = true
+				if tab_state.pane_tree.cwd and tab_state.pane_tree.cwd ~= "" then
+					local cd_cmd = "cd " .. wezterm.shell_join_args({ tab_state.pane_tree.cwd })
+					tab_state.pane_tree.cd_marker = cd_cmd
+					opts.pane:send_text(cd_cmd .. "\r\n")
+				end
 			end
 			opts.pane_needs_cd = nil
 		else
