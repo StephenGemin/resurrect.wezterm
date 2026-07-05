@@ -13,6 +13,7 @@ function pub.restore_workspace(workspace_state, opts)
 	end
 
 	wezterm.emit("resurrect.workspace_state.restore_workspace.start")
+	state_manager_mod.extend_save_suppression()
 	if opts == nil then
 		opts = {}
 	end

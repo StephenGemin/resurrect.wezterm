@@ -80,6 +80,33 @@ function pub.load_state(name, type)
 	return json
 end
 
+-- Saves fired while a restore is in flight capture half-built panes: wezterm
+-- queues pane/window focus events during a restore and delivers them before
+-- restore_baseline's settle snapshots exist, so an event-driven save in that
+-- gap overwrites the state that was just restored with mid-restore wreckage.
+-- Restore entry points and every restored pane extend this deadline;
+-- event-driven and periodic saves check it. Manual keybind saves are
+-- deliberately unaffected.
+local DEFAULT_SAVE_SUPPRESSION_SECONDS = 5
+local _suppress_saves_until = 0
+
+---Suppress event-driven and periodic saves for at least `seconds` (default
+---5) from now; extends, never shortens, the current suppression window.
+---@param seconds? integer
+function pub.extend_save_suppression(seconds)
+	if seconds == nil then
+		seconds = DEFAULT_SAVE_SUPPRESSION_SECONDS
+	end
+	local deadline = os.time() + seconds
+	if deadline > _suppress_saves_until then
+		_suppress_saves_until = deadline
+	end
+end
+
+local function saves_suppressed()
+	return os.time() < _suppress_saves_until
+end
+
 -- Shared by periodic_save and event_driven_save: saves workspace state and
 -- keeps current_state pointed at it, so both paths stay restore-on-startup-safe.
 local function save_workspace()
@@ -126,6 +153,11 @@ function pub.periodic_save(opts)
 		opts.interval_seconds = 60 * 15
 	end
 	wezterm.time.call_after(opts.interval_seconds, function()
+		if saves_suppressed() then
+			wezterm.log_info("resurrect: periodic_save skipped, restore in flight")
+			pub.periodic_save(opts)
+			return
+		end
 		local ok, err = pcall(function()
 			wezterm.emit("resurrect.state_manager.periodic_save.start", opts)
 			if opts.save_workspaces then
@@ -179,6 +211,10 @@ function pub.event_driven_save(opts)
 	local last_structure = {}
 
 	local function do_save(window)
+		if saves_suppressed() then
+			wezterm.log_info("resurrect: event_driven_save skipped, restore in flight")
+			return
+		end
 		local ok, err = pcall(function()
 			wezterm.emit("resurrect.state_manager.event_driven_save.start", opts)
 

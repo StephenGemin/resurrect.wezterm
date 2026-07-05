@@ -321,6 +321,11 @@ end
 --- Function to restore text or processes when restoring panes
 ---@param pane_tree pane_tree
 function pub.default_on_pane_restore(pane_tree)
+	-- Each restored pane pushes the save-suppression deadline out again, so
+	-- the window outlives the settle snapshot of the last pane in a large
+	-- tree. Lazy require: state_manager reaches back into pane_tree via
+	-- set_max_nlines, so a top-level require here would risk a cycle.
+	require("resurrect.state_manager").extend_save_suppression()
 	local pane = pane_tree.pane
 
 	-- Spawn process if using alt screen, otherwise restore text

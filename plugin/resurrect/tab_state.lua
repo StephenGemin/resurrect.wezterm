@@ -98,6 +98,7 @@ end
 ---@param opts restore_opts
 function pub.restore_tab(tab, tab_state, opts)
 	wezterm.emit("resurrect.tab_state.restore_tab.start")
+	state_manager_mod.extend_save_suppression()
 
 	-- Wrapped in pcall so a thrown error partway through (bad split args, a
 	-- malformed saved pane_tree, etc.) surfaces as resurrect.error instead of
