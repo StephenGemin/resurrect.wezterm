@@ -28,6 +28,29 @@ function pub.restore_workspace(workspace_state, opts)
 			opts.spawn_in_workspace = true
 		end
 
+		-- Whether to switch the active workspace to the restored one. `switch_workspace`
+		-- is nil by default and falls back to `spawn_in_workspace`, preserving the
+		-- behaviour of callers that set neither. Pass `switch_workspace = false` to opt out.
+		local should_switch = opts.switch_workspace
+		if should_switch == nil then
+			should_switch = opts.spawn_in_workspace
+		end
+
+		-- Already-live workspace: switch to it (when should_switch) rather than restore a
+		-- duplicate window set that the next save would persist. Safe on gui-startup: the
+		-- mux is empty when it fires, so nothing matches here.
+		local target = workspace_state.workspace
+		if target and target ~= "" then
+			for _, mux_win in ipairs(wezterm.mux.all_windows()) do
+				if mux_win:get_workspace() == target then
+					if should_switch then
+						wezterm.mux.set_active_workspace(target)
+					end
+					return true
+				end
+			end
+		end
+
 		for i, window_state in ipairs(workspace_state.window_states) do
 			if i == 1 and opts.window then
 				-- inner size is in pixels
@@ -74,13 +97,7 @@ function pub.restore_workspace(workspace_state, opts)
 
 		-- Switch the active workspace to the one just restored, so the user actually
 		-- lands in it rather than staying in (or being dropped into) another workspace.
-		-- Backwards compatible: when `switch_workspace` is unset we fall back to the
-		-- value of `spawn_in_workspace`, preserving the previous behaviour for callers
-		-- that did neither. Pass `switch_workspace = false` to opt out explicitly.
-		local should_switch = opts.switch_workspace
-		if should_switch == nil then
-			should_switch = opts.spawn_in_workspace
-		end
+		-- should_switch was resolved above, next to the already-live guard.
 		if workspace_state.workspace and workspace_state.workspace ~= "" then
 			if should_switch then
 				wezterm.mux.set_active_workspace(workspace_state.workspace)

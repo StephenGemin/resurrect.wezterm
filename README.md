@@ -301,6 +301,13 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 > which defaulted to `false`. If you relied on restored windows landing in the
 > `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
 
+> [!NOTE]
+> If the workspace you restore already has live windows (e.g. you loaded it earlier in
+> the session), `restore_workspace` switches to it instead of spawning a duplicate set
+> of windows. The switch still honours `switch_workspace`, so `switch_workspace = false`
+> leaves you where you are. Restoring from the saved snapshot happens only when the
+> workspace isn't already live (e.g. on startup or first load).
+
 #### Configuring the safe-restore process list
 
 When restoring a pane that was left in alt-screen mode (e.g. an editor or a TUI app),
