@@ -288,13 +288,8 @@ resurrect.setup(config, {
 > Set only one of `add` or `replace`; if both are given, `replace` takes precedence and
 > `add` is ignored.
 
-Or call the underlying functions directly, without `setup()`:
-
-```lua
-resurrect.pane_tree.add_safe_restore_processes({ "lazygit", "k9s" })
--- or, to fully replace (pass {} to disable process relaunch entirely):
-resurrect.pane_tree.set_safe_restore_processes({ "vim", "nvim" })
-```
+To call the underlying functions directly instead of going through `setup()`, see
+[`docs/recipes/safe-restore-processes-direct.lua`](docs/recipes/safe-restore-processes-direct.lua).
 
 #### Restoring into the current window
 
@@ -527,32 +522,9 @@ This plugin emits the following events that you can use for your own callback fu
 - `resurrect.workspace_state.restore_workspace.finished`
 - `resurrect.workspace_state.restore_workspace.start`
 
-Example: sending a toast notification when specified events occur, but suppress on `periodic_save()`:
-
-```lua
-local resurrect_event_listeners = {
-  "resurrect.error",
-  "resurrect.file_io.write_state.finished",
-}
-local is_periodic_save = false
-wezterm.on("resurrect.state_manager.periodic_save.start", function()
-  is_periodic_save = true
-end)
-for _, event in ipairs(resurrect_event_listeners) do
-  wezterm.on(event, function(...)
-    if event == "resurrect.file_io.write_state.finished" and is_periodic_save then
-      is_periodic_save = false
-      return
-    end
-    local args = { ... }
-    local msg = event
-    for _, v in ipairs(args) do
-      msg = msg .. " " .. tostring(v)
-    end
-    wezterm.gui.gui_windows()[1]:toast_notification("Wezterm - resurrect", msg, nil, 4000)
-  end)
-end
-```
+See [`docs/recipes/toast-notification-events.lua`](docs/recipes/toast-notification-events.lua)
+for an example that sends a toast notification on selected events, suppressing the noisy
+`periodic_save()` write-finished event.
 
 ## State files
 
