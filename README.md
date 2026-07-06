@@ -126,7 +126,10 @@ steps and behavioral differences.
 
 ## Advanced Setup
 
-If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
+If you need fine-grained control over each component, you can configure them individually
+instead of using `setup()`. See [`docs/advanced-setup.lua`](docs/advanced-setup.lua) for a
+complete, drop-in config file wiring up everything below manually — the sections here walk
+through it piece by piece.
 
 ### Resurrecting on startup
 
@@ -288,15 +291,14 @@ resurrect.setup(config, {
 > Set only one of `add` or `replace`; if both are given, `replace` takes precedence and
 > `add` is ignored.
 
-To call the underlying functions directly instead of going through `setup()`, see
-[`docs/recipes/safe-restore-processes-direct.lua`](docs/recipes/safe-restore-processes-direct.lua).
+To call the underlying functions directly instead of going through `setup()`, see the
+safe-restore-process section of [`docs/advanced-setup.lua`](docs/advanced-setup.lua).
 
 #### Restoring into the current window
 
 To restore a window state into the current window instead of spawning a new one, pass
-`close_open_tabs` — see
-[`docs/recipes/restore-into-current-window.lua`](docs/recipes/restore-into-current-window.lua)
-for a complete, drop-in config file.
+`close_open_tabs` — see "Option D" in [`docs/advanced-setup.lua`](docs/advanced-setup.lua)
+for a complete example.
 
 #### Windows not resizing correctly
 
@@ -307,8 +309,8 @@ To avoid this, set `resize_window = false` in your `restore_opts`.
 #### Manual dispatch
 
 If you need full control over how each state type is restored, call `fuzzy_load` directly —
-see [`docs/recipes/manual-dispatch-restore.lua`](docs/recipes/manual-dispatch-restore.lua)
-for a complete, drop-in config file that dispatches on workspace/window/tab.
+see "Option C" in [`docs/advanced-setup.lua`](docs/advanced-setup.lua) for a complete
+example that dispatches on workspace/window/tab.
 
 #### fuzzy_load opts
 
@@ -359,9 +361,7 @@ config.keys = {
 #### Manual dispatch
 
 For full control over the delete picker (custom title, description, etc.) instead of using
-`delete_action()`, see
-[`docs/recipes/delete-state-manual-dispatch.lua`](docs/recipes/delete-state-manual-dispatch.lua)
-for a complete, drop-in config file.
+`delete_action()`, see "Option B" (Delete) in [`docs/advanced-setup.lua`](docs/advanced-setup.lua).
 
 ### Encryption (optional, recommended)
 
@@ -522,7 +522,7 @@ This plugin emits the following events that you can use for your own callback fu
 - `resurrect.workspace_state.restore_workspace.finished`
 - `resurrect.workspace_state.restore_workspace.start`
 
-See [`docs/recipes/toast-notification-events.lua`](docs/recipes/toast-notification-events.lua)
+See the toast-notification section of [`docs/advanced-setup.lua`](docs/advanced-setup.lua)
 for an example that sends a toast notification on selected events, suppressing the noisy
 `periodic_save()` write-finished event.
 

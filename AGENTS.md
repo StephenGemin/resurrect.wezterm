@@ -37,6 +37,10 @@ spec/
 scripts/
   migrate-from-mlflexer.sh   copies old MLFlexer state files into this fork's default dir
                              (macOS, Linux, Windows via Git Bash)
+docs/
+  workspace-switching.md     live/not-live model, spawn_in_workspace/switch_workspace behavior
+  migrating-from-mlflexer.md data migration steps + behavioral differences from MLFlexer
+  advanced-setup.lua         complete drop-in config wiring every component manually
 README.md
 AGENTS.md                    (this file)
 CLAUDE.md                    AI assistant guidance

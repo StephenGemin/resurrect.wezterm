@@ -82,5 +82,5 @@ resurrect.workspace_state.restore_workspace(state, {
 })
 ```
 
-See [`recipes/restore-no-switch.lua`](./recipes/restore-no-switch.lua) for a complete,
-drop-in config file.
+See "Option B" in [`advanced-setup.lua`](./advanced-setup.lua) for this wired up as a
+complete keybinding.
