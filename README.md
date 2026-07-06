@@ -81,6 +81,7 @@ resurrect.setup(config, {
   save_windows      = true,
   save_tabs         = true,
   save_on_focus_loss = true, -- also save immediately on alt-tab away
+  switch_workspace  = nil,   -- default for restore's switch_workspace; nil follows spawn_in_workspace
   keybindings       = true,  -- set false to define your own (see below)
   status_bar        = true,  -- show last save time and tab titles in the right status bar
   safe_restore_processes = nil, -- { add = {...} } or { replace = {...} }, see below
@@ -298,7 +299,10 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 > combination of the two is coherent: `{ spawn_in_workspace = true, switch_workspace =
 > false }` populates the named workspace in the background without moving you, and
 > `{ spawn_in_workspace = false, switch_workspace = true }` still lands you in the
-> restored workspace.
+> restored workspace. To change the default for every restore, pass
+> `switch_workspace` to `setup()` — a per-call opt still wins over it. Startup restore
+> always switches to the restored workspace regardless; `switch_workspace` governs
+> mid-session restores.
 
 > [!WARNING]
 > The `spawn_in_workspace = true` default is a breaking change from earlier versions,

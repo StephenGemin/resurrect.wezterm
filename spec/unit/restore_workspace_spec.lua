@@ -115,4 +115,25 @@ describe("workspace_state.restore_workspace defaults", function()
 		assert.is_nil(helper.find_call(rec, "spawn_window"))
 		assert.is_nil(helper.find_call(rec, "set_active_workspace"))
 	end)
+
+	describe("switch_workspace_default (set via setup())", function()
+		it("governs switching when a caller leaves switch_workspace unset", function()
+			-- setup({ switch_workspace = false }): mid-session restores stop switching even
+			-- though spawn_in_workspace still defaults true.
+			workspace_state.switch_workspace_default = false
+			workspace_state.restore_workspace(sample_state())
+
+			assert.are.equal("myws", helper.find_call(rec, "spawn_window").args.workspace)
+			assert.is_nil(helper.find_call(rec, "set_active_workspace"))
+		end)
+
+		it("is overridden by an explicit per-call switch_workspace", function()
+			workspace_state.switch_workspace_default = false
+			workspace_state.restore_workspace(sample_state(), { switch_workspace = true })
+
+			local switch = helper.find_call(rec, "set_active_workspace")
+			assert.is_not_nil(switch)
+			assert.are.equal("myws", switch.workspace)
+		end)
+	end)
 end)

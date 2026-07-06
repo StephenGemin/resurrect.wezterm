@@ -36,12 +36,13 @@ init()
 ---   save_windows       = true
 ---   save_tabs          = true
 ---   save_on_focus_loss = true   -- also save immediately when a window loses OS focus (e.g. alt-tab away)
+---   switch_workspace   = nil    -- default for restore's switch_workspace opt; nil follows spawn_in_workspace
 ---   keybindings        = true   -- add Alt+W/R/Shift+W/Shift+T bindings
 ---   status_bar         = true   -- show save time + tab titles in right status
 ---   safe_restore_processes = { add = {...} } or { replace = {...} } -- extend/replace
 ---                                the allowlist of processes relaunched on restore
 ---
----@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, save_on_focus_loss: boolean?, keybindings: boolean?, status_bar: boolean?, safe_restore_processes: {add: string[]?, replace: string[]?}?}
+---@alias setup_opts {periodic_interval: integer?, restore_delay: integer?, save_workspaces: boolean?, save_windows: boolean?, save_tabs: boolean?, save_on_focus_loss: boolean?, switch_workspace: boolean?, keybindings: boolean?, status_bar: boolean?, safe_restore_processes: {add: string[]?, replace: string[]?}?}
 
 ---@param config table wezterm config_builder object
 ---@param opts? setup_opts optional overrides
@@ -71,6 +72,12 @@ function pub.setup(config, opts)
 	-- Restore delay for process commands (shells need time to init)
 	if opts.restore_delay then
 		pub.pane_tree.process_restore_delay_seconds = opts.restore_delay
+	end
+
+	-- Default for restore_workspace's switch_workspace opt (per-call opt still wins).
+	-- Startup restore always switches regardless; this governs mid-session restores.
+	if opts.switch_workspace ~= nil then
+		pub.workspace_state.switch_workspace_default = opts.switch_workspace
 	end
 
 	-- Safe-restore process allowlist: extend or replace the defaults
