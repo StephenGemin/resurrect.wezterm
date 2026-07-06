@@ -73,9 +73,36 @@ describe("workspace_state.restore_workspace defaults", function()
 		-- Still spawns into the saved workspace...
 		local spawn = helper.find_call(rec, "spawn_window")
 		assert.are.equal("myws", spawn.args.workspace)
-		-- ...but does not switch the active workspace.
+		-- ...but does not switch the active workspace...
 		assert.is_nil(helper.find_call(rec, "set_active_workspace"))
+		-- ...and does not rename the current workspace to the target's name. The windows
+		-- landed in the target (tagged), so renaming would alias two workspaces to "myws".
+		assert.is_nil(helper.find_call(rec, "rename_workspace"))
 	end)
+
+	it("spawn_in_workspace=false + switch_workspace=true forces the tag so the switch lands", function()
+		workspace_state.restore_workspace(sample_state(), {
+			spawn_in_workspace = false,
+			switch_workspace = true,
+		})
+
+		-- The switch intent forces windows to be tagged into the target, so the workspace
+		-- is populated before the switch (otherwise set_active_workspace crashes on an
+		-- empty workspace name).
+		local spawn = helper.find_call(rec, "spawn_window")
+		assert.are.equal("myws", spawn.args.workspace)
+
+		local switch = helper.find_call(rec, "set_active_workspace")
+		assert.is_not_nil(switch)
+		assert.are.equal("myws", switch.workspace)
+
+		assert.is_nil(helper.find_call(rec, "rename_workspace"))
+	end)
+
+	-- Out of scope: a caller reusing an existing window (opts.window) with a single-window
+	-- state + truthy switch intent can still hit an empty-switch — the reused window isn't
+	-- retagged and there is no MuxWindow:set_workspace. The fuzzy picker forces window=nil,
+	-- so it never triggers there; not solved here.
 
 	it("returns without side effects when the state is nil", function()
 		workspace_state.restore_workspace(nil)
