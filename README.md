@@ -165,6 +165,10 @@ yourself:
 
 The saved-state JSON schema is unchanged, so copied files load without any conversion.
 
+For behavioral differences from MLFlexer's version (not just the file-location move above —
+e.g. restore switching to the workspace by default), see
+[`docs/migrating-from-mlflexer.md`](docs/migrating-from-mlflexer.md).
+
 ## Advanced Setup
 
 If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
@@ -288,29 +292,14 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 ```
 
 > [!NOTE]
-> `spawn_in_workspace` defaults to `true`: the restored windows are spawned into the
-> saved workspace and the active workspace is switched to it. Set
-> `spawn_in_workspace = false` to keep the legacy behaviour, where the windows are
-> spawned into Wezterm's `"default"` workspace and the active workspace is **not**
-> changed — so you stay where you are and the restored windows appear under
-> `"default"`. By default `switch_workspace` follows `spawn_in_workspace`; set it
-> explicitly to switch (or not) independently of where the windows are spawned. Every
-> combination of the two is coherent: `{ spawn_in_workspace = true, switch_workspace =
-> false }` populates the named workspace in the background without moving you, and
-> `{ spawn_in_workspace = false, switch_workspace = true }` still lands you in the
-> restored workspace.
-
-> [!WARNING]
-> The `spawn_in_workspace = true` default is a breaking change from earlier versions,
-> which defaulted to `false`. If you relied on restored windows landing in the
-> `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
-
-> [!NOTE]
-> If the workspace you restore already has live windows (e.g. you loaded it earlier in
-> the session), `restore_workspace` switches to it instead of spawning a duplicate set
-> of windows. The switch still honours `switch_workspace`, so `switch_workspace = false`
-> leaves you where you are. Restoring from the saved snapshot happens only when the
-> workspace isn't already live (e.g. on startup or first load).
+> `spawn_in_workspace` defaults to `true` (tag restored windows into the saved workspace
+> and switch to it) — a breaking change from earlier versions, which defaulted to `false`.
+> Set `spawn_in_workspace = false` to restore the old behaviour: windows spawn into
+> Wezterm's `"default"` workspace and the active workspace doesn't change.
+> `switch_workspace` follows `spawn_in_workspace` unless set explicitly, and every
+> combination of the two is coherent. Reloading a workspace that already has live windows
+> switches to it instead of duplicating it. See
+> [`docs/workspace-switching.md`](docs/workspace-switching.md) for the full model.
 
 #### Configuring the safe-restore process list
 
@@ -378,38 +367,9 @@ To avoid this, set `resize_window = false` in your `restore_opts`.
 
 #### Manual dispatch
 
-If you need full control over how each state type is restored, call `fuzzy_load` directly:
-
-```lua
-action = wezterm.action_callback(function(win, pane)
-  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
-    local type = string.match(id, "^([^/]+)") -- match before '/'
-    id = string.match(id, "([^/]+)$") -- match after '/'
-    id = string.match(id, "(.+)%..+$") -- remove file extension
-    local opts = {
-      relative = true,
-      restore_text = true,
-      on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
-    }
-    if type == "workspace" then
-      local state = resurrect.state_manager.load_state(id, "workspace")
-      -- Restores the windows into the saved workspace and switches you to it.
-      -- Pass `spawn_in_workspace = false` to spawn into "default" without switching.
-      resurrect.workspace_state.restore_workspace(state, opts)
-    elseif type == "window" then
-      local state = resurrect.state_manager.load_state(id, "window")
-      resurrect.window_state.restore_window(pane:window(), state, opts)
-    elseif type == "tab" then
-      local state = resurrect.state_manager.load_state(id, "tab")
-      local new_tab, new_pane = pane:window():spawn_tab({
-        cwd = state.pane_tree and state.pane_tree.cwd or nil,
-      })
-      opts.pane = new_pane
-      resurrect.tab_state.restore_tab(new_tab, state, opts)
-    end
-  end)
-end),
-```
+If you need full control over how each state type is restored, call `fuzzy_load` directly —
+see [`docs/examples/manual-dispatch-restore.lua`](docs/examples/manual-dispatch-restore.lua)
+for a complete example that dispatches on workspace/window/tab.
 
 #### fuzzy_load opts
 
