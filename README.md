@@ -300,7 +300,7 @@ resurrect.pane_tree.set_safe_restore_processes({ "vim", "nvim" })
 
 To restore a window state into the current window instead of spawning a new one, pass
 `close_open_tabs` — see
-[`docs/examples/restore-into-current-window.lua`](docs/examples/restore-into-current-window.lua)
+[`docs/recipes/restore-into-current-window.lua`](docs/recipes/restore-into-current-window.lua)
 for a complete, drop-in config file.
 
 #### Windows not resizing correctly
@@ -312,7 +312,7 @@ To avoid this, set `resize_window = false` in your `restore_opts`.
 #### Manual dispatch
 
 If you need full control over how each state type is restored, call `fuzzy_load` directly —
-see [`docs/examples/manual-dispatch-restore.lua`](docs/examples/manual-dispatch-restore.lua)
+see [`docs/recipes/manual-dispatch-restore.lua`](docs/recipes/manual-dispatch-restore.lua)
 for a complete, drop-in config file that dispatches on workspace/window/tab.
 
 #### fuzzy_load opts
@@ -365,7 +365,7 @@ config.keys = {
 
 For full control over the delete picker (custom title, description, etc.) instead of using
 `delete_action()`, see
-[`docs/examples/delete-state-manual-dispatch.lua`](docs/examples/delete-state-manual-dispatch.lua)
+[`docs/recipes/delete-state-manual-dispatch.lua`](docs/recipes/delete-state-manual-dispatch.lua)
 for a complete, drop-in config file.
 
 ### Encryption (optional, recommended)

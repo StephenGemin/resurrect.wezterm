@@ -82,5 +82,5 @@ resurrect.workspace_state.restore_workspace(state, {
 })
 ```
 
-See [`examples/restore-no-switch.lua`](./examples/restore-no-switch.lua) for a complete,
+See [`recipes/restore-no-switch.lua`](./recipes/restore-no-switch.lua) for a complete,
 drop-in config file.
