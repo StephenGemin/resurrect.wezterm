@@ -298,21 +298,10 @@ resurrect.pane_tree.set_safe_restore_processes({ "vim", "nvim" })
 
 #### Restoring into the current window
 
-To restore a window state into the current window use `restore_window` with `close_open_tabs`:
-
-```lua
-local opts = {
-  close_open_tabs = true,
-  window = pane:window(),
-  on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
-  relative = true,
-  restore_text = true,
-}
-resurrect.window_state.restore_window(pane:window(), state, opts)
-```
-
-This will restore the state into the passed window and additionally close all
-the tabs in the window, such that only the restored tabs are visible after restoring.
+To restore a window state into the current window instead of spawning a new one, pass
+`close_open_tabs` — see
+[`docs/examples/restore-into-current-window.lua`](docs/examples/restore-into-current-window.lua)
+for a complete, drop-in config file.
 
 #### Windows not resizing correctly
 
@@ -374,19 +363,10 @@ config.keys = {
 
 #### Manual dispatch
 
-```lua
-action = wezterm.action_callback(function(win, pane)
-  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
-      resurrect.state_manager.delete_state(id)
-    end,
-    {
-      title = "Delete State",
-      description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
-      fuzzy_description = "Search State to Delete: ",
-      is_fuzzy = true,
-    })
-end),
-```
+For full control over the delete picker (custom title, description, etc.) instead of using
+`delete_action()`, see
+[`docs/examples/delete-state-manual-dispatch.lua`](docs/examples/delete-state-manual-dispatch.lua)
+for a complete, drop-in config file.
 
 ### Encryption (optional, recommended)
 
