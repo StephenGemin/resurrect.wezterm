@@ -69,7 +69,7 @@ MLFlexer's own recommended keybinding recipes call `SwitchToWorkspace` immediate
 contents) was always the same; MLFlexer just left composing the switch to the user. This fork
 builds that into `restore_workspace` itself via `spawn_in_workspace` + `switch_workspace`,
 defaulting to "on" for backwards-compat-friendly behavior (see
-[workspace-switching.md](./workspace-switching.md) for the full model).
+[workspace_switching.md](./workspace_switching.md) for the full model).
 
 ### Getting the old (MLFlexer-style) behavior back
 

@@ -30,7 +30,7 @@ end)
 
 This fork's `restore_workspace` switches to a workspace's live windows instead of
 re-materializing its snapshot whenever the workspace already has *any* live window (see
-[`workspace-switching.md`](./workspace-switching.md)) — this avoids spawning duplicate
+[`workspace_switching.md`](./workspace_switching.md)) — this avoids spawning duplicate
 windows when you reload an already-open workspace.
 
 That guard collides with `created`: by the time this event fires, `smart_workspace_switcher`

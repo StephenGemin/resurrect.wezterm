@@ -50,6 +50,8 @@ function M.setup(config)
 
 	-- --- Startup restore -------------------------------------------------
 
+	-- Only has something to restore if save_workspaces = true above wrote a state file
+	-- for the workspace to read back.
 	wezterm.on('gui-startup', resurrect.state_manager.resurrect_on_gui_startup)
 
 	-- --- Safe-restore process allowlist ----------------------------------
@@ -107,7 +109,7 @@ M.keys = {
 	},
 
 	-- Option B: restore into the current workspace without switching
-	-- (MLFlexer-equivalent behavior). See docs/migrating-from-mlflexer.md.
+	-- (MLFlexer-equivalent behavior). See docs/migrating_from_mlflexer.md.
 	-- {
 	--   key = 'r',
 	--   mods = 'ALT',

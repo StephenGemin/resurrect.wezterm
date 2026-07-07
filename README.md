@@ -11,7 +11,7 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
   - [Features](#features)
   - [Basic Setup](#basic-setup)
     - [Setup Options](#setup-options)
-  - [Migrating from MLFlexer's resurrect.wezterm](#migrating-from-mlflexers-resurrectwezterm)
+  - [Migrating from MLFlexer's resurrect.wezterm](#migrating_from_mlflexers-resurrectwezterm)
   - [Advanced Setup](#advanced-setup)
     - [Creating a workspace](#creating-a-workspace)
     - [Saving state](#saving-state)
@@ -118,7 +118,7 @@ To define your own keybindings, set `keybindings = false` and see [Saving state]
 This project is a fork of [MLFlexer's original `resurrect.wezterm`](https://github.com/MLFlexer/resurrect.wezterm),
 which is now archived. The API is largely unchanged, but the default state-file location
 moved and a few behaviors differ (e.g. restore switching to the workspace by default) — see
-[`docs/migrating-from-mlflexer.md`](docs/migrating-from-mlflexer.md) for the full migration
+[`docs/migrating_from_mlflexer.md`](docs/migrating_from_mlflexer.md) for the full migration
 steps and behavioral differences.
 
 ## Advanced Setup
@@ -140,7 +140,8 @@ The sections below cover what's worth knowing beyond what's already in that file
 
 ### Creating a workspace
 
-`create_workspace_action()` only switches the active workspace; it does not save anything.
+`create_workspace_action()` is a thin wrapper around wezterm's own `PromptInputLine` +
+`SwitchToWorkspace` pattern; it only switches the active workspace and does not save anything.
 Save the new workspace's state with `save_workspace_action()` once you're in it.
 
 ### Saving state
@@ -168,8 +169,8 @@ config.keys = {
 ```
 
 `restore_action` accepts `restore_opts` to control restore behaviour (see
-[`docs/restore-opts.md`](docs/restore-opts.md)) and an optional `fuzzy_load_opts` sub-table to
-customise the picker (see [`docs/fuzzy-load-opts.md`](docs/fuzzy-load-opts.md)). Workspace and
+[`docs/restore_opts.md`](docs/restore_opts.md)) and an optional `fuzzy_load_opts` sub-table to
+customise the picker (see [`docs/fuzzy_load_opts.md`](docs/fuzzy_load_opts.md)). Workspace and
 window restores always spawn a new GUI window and never modify the window the picker was
 invoked from, matching tmux-resurrect behaviour where restoring a session never touches your
 current context. Tab restores always add to the current window, since a tab can't exist
@@ -230,7 +231,7 @@ for a complete example.
 Some users has had problems with `window_decorations` and `window_padding`
 configuration options, which caused issues when resizing, see [comment](https://github.com/StephenGemin/resurrect.wezterm/issues/72#issuecomment-2582912347).
 To avoid this, set `resize_window = false` in your `restore_opts` (see
-[`docs/restore-opts.md`](docs/restore-opts.md)).
+[`docs/restore_opts.md`](docs/restore_opts.md)).
 
 #### Manual dispatch
 
@@ -241,7 +242,7 @@ example that dispatches on workspace/window/tab.
 ### Deleting state
 
 `delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` (see
-[`docs/fuzzy-load-opts.md`](docs/fuzzy-load-opts.md)) to customise the picker title,
+[`docs/fuzzy_load_opts.md`](docs/fuzzy_load_opts.md)) to customise the picker title,
 description, etc.
 
 #### Manual dispatch

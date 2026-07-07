@@ -44,13 +44,20 @@ vs. "leave it running in the background") through two knobs.
 |---|---|---|---|
 | `true` (default) | `true` / unset | no | Tag windows into the target, switch to it — you land in it. |
 | `true` | `false` | no | Tag windows into the target, stay put — populates the workspace in the background. |
-| `false` | `false` / unset | no | Spawn into the current workspace, then rename it to the target name (legacy in-place restore, matches the old default). |
+| `false` | `false` / unset | no | Spawn into the current workspace, then rename it to the target name (legacy in-place restore, matches the old default).[^1] |
 | `false` | `true` | no | Spawn into the target instead of the current workspace, then switch to it. |
 | *any* | resolved | **yes** | Switch to the live workspace (or stay, if `switch_workspace = false`) — no duplicate windows are spawned. |
 
 Every combination of `spawn_in_workspace`/`switch_workspace` is coherent — the switch intent
 always determines where the windows actually land, so there's no unsupported combination to
 avoid.
+
+[^1]: This path is additive, not a fresh restore: the restored window is spawned alongside
+    whatever the current workspace already contains, and the rename then applies to that
+    combined set. If you autosave (periodic or on-focus-loss) after this, the saved file for
+    the target name grows to include the pre-existing windows too — and grows again each time
+    you repeat the cycle. This is inherent to spawn-into-current + rename-whole-workspace, not
+    a bug; avoid pointing `spawn_in_workspace = false` at a workspace name you also autosave.
 
 ## Scope
 

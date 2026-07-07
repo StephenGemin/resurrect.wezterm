@@ -4,7 +4,7 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 
 ```lua
 {
-  spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace; default: true. Set false to spawn into the current workspace
+  spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace; default: true. Set false to spawn into the current workspace (merges into and renames it — see the note on this in workspace_switching.md)
   switch_workspace: boolean?,   -- Switch the active workspace to the restored one; defaults to the value of spawn_in_workspace
   relative: boolean?,           -- Size new pane splits as a fraction of their parent (recommended if the restoring window isn't the same size as when saved)
   absolute: boolean?,           -- Size new pane splits using the saved absolute row/column counts instead of a fraction
@@ -20,7 +20,7 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 
 `spawn_in_workspace` and `switch_workspace` are workspace-only (`restore_window`/`restore_tab`
 ignore them) and have enough nuance to warrant their own doc — see
-[`workspace-switching.md`](./workspace-switching.md) for the full model, the current
+[`workspace_switching.md`](./workspace_switching.md) for the full model, the current
 `spawn`/`switch` behavior table, and the breaking-change note from earlier versions.
 
 ## Reusing an existing window, tab, or pane

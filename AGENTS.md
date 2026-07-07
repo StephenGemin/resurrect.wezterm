@@ -38,11 +38,11 @@ scripts/
   migrate-from-mlflexer.sh   copies old MLFlexer state files into this fork's default dir
                              (macOS, Linux, Windows via Git Bash)
 docs/
-  workspace-switching.md     live/not-live model, spawn_in_workspace/switch_workspace behavior
-  migrating-from-mlflexer.md data migration steps + behavioral differences from MLFlexer
-  smart-workspace-switcher.md integration notes for MLFlexer's (archived) workspace switcher
-  restore-opts.md            full restore_opts reference table
-  fuzzy-load-opts.md         full fuzzy_load_opts reference table
+  workspace_switching.md     live/not-live model, spawn_in_workspace/switch_workspace behavior
+  migrating_from_mlflexer.md data migration steps + behavioral differences from MLFlexer
+  smart_workspace_switcher.md integration notes for MLFlexer's (archived) workspace switcher
+  restore_opts.md            full restore_opts reference table
+  fuzzy_load_opts.md         full fuzzy_load_opts reference table
   advanced-setup.lua         complete drop-in config wiring every component manually
 README.md
 AGENTS.md                    (this file)
