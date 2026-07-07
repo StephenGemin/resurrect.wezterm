@@ -31,4 +31,29 @@ resurrect.setup(config, {
 	keybindings = false,
 })
 
+-- Test-only dispatch hook so a headless driver can invoke the plugin's REAL
+-- restore/delete code paths without the fuzzy picker (wezterm cli can't navigate
+-- an InputSelector). `drive.sh restore <ws>` / `delete <ws>` make the shell emit
+-- an OSC SetUserVar, which fires user-var-changed. This calls the SAME public API
+-- fuzzy_loader.restore_action / delete_action call — it bypasses the picker UI, it
+-- does NOT ship in the plugin. See SKILL.md "Driving the picker flows".
+wezterm.on("user-var-changed", function(_window, _pane, name, value)
+	if name == "resurrect_test_restore" then
+		-- Mirror restore_action's workspace restorer: no window in opts, so
+		-- restore_workspace spawns fresh windows for the whole saved state.
+		resurrect.workspace_state.restore_workspace(
+			resurrect.state_manager.load_state(value, "workspace"),
+			{
+				relative = true,
+				restore_text = true,
+				on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+			}
+		)
+	elseif name == "resurrect_test_delete" then
+		-- delete_state wants a path RELATIVE to the save dir (it prepends the dir
+		-- and rejects absolute paths); mirror what delete_action passes as `id`.
+		resurrect.state_manager.delete_state("workspace/" .. value .. ".json")
+	end
+end)
+
 return config
