@@ -150,6 +150,26 @@ Call `report` any time to regenerate after editing `verdict.md`.
   ```
   Images can't be grepped/asserted on — prefer `get-text` for anything automatable.
 
+## Limitations — what this skill can't drive
+
+`wezterm cli` (20240203) has **no key-event verb** and cannot navigate an
+`InputSelector`, so the plugin's **interactive picker flows are not drivable** by this
+skill:
+
+- create workspace — `Alt+Shift+N` (`workspace_state.create_workspace_action`, name prompt)
+- fuzzy restore/switch — `Alt+R` (`fuzzy_loader.restore_action`)
+- fuzzy delete — `Alt+D` (`fuzzy_loader.delete_action`)
+
+This skill drives the **save → restart → restore round trip** (cli-built layouts +
+gui-startup restore), which is a different code path from those UI flows. To exercise
+the underlying restore/delete/save *logic* without the picker, **bypass** it by calling
+the already-public API directly — e.g. a `wezterm.on("user-var-changed", …)` hook in
+`test-config.lua` that calls `workspace_state.restore_workspace(load_state(name,
+"workspace"), …)` / `state_manager.delete_state("workspace/"..name..".json")`,
+triggered from the driver via a shell-emitted OSC `SetUserVar`. That bypasses the
+fuzzy finder; it does **not** drive it. Note: restoring the currently-live workspace
+hits the switch-to-live guard (no spawn) — target a non-live workspace to see a restore.
+
 ## Cleanup / safety
 
 `./drive.sh stop` kills only the pid it launched and runs `git checkout -- .` in
