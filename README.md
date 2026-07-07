@@ -294,7 +294,11 @@ Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `r
 > spawned into Wezterm's `"default"` workspace and the active workspace is **not**
 > changed — so you stay where you are and the restored windows appear under
 > `"default"`. By default `switch_workspace` follows `spawn_in_workspace`; set it
-> explicitly to switch (or not) independently of where the windows are spawned.
+> explicitly to switch (or not) independently of where the windows are spawned. Every
+> combination of the two is coherent: `{ spawn_in_workspace = true, switch_workspace =
+> false }` populates the named workspace in the background without moving you, and
+> `{ spawn_in_workspace = false, switch_workspace = true }` still lands you in the
+> restored workspace.
 
 > [!WARNING]
 > The `spawn_in_workspace = true` default is a breaking change from earlier versions,

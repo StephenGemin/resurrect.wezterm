@@ -31,19 +31,32 @@ function pub.restore_workspace(workspace_state, opts)
 		-- Whether to switch the active workspace to the restored one. `switch_workspace`
 		-- is nil by default and falls back to `spawn_in_workspace`, preserving the
 		-- behaviour of callers that set neither. Pass `switch_workspace = false` to opt out.
-		local should_switch = opts.switch_workspace
-		if should_switch == nil then
-			should_switch = opts.spawn_in_workspace
+		local should_switch_workspace = opts.switch_workspace
+		if should_switch_workspace == nil then
+			should_switch_workspace = opts.spawn_in_workspace
 		end
 
-		-- Already-live workspace: switch to it (when should_switch) rather than restore a
-		-- duplicate window set that the next save would persist. Safe on gui-startup: the
-		-- mux is empty when it fires, so nothing matches here.
+		-- Spawn windows into the target workspace whenever we'll switch to it too: switching
+		-- into a workspace with no windows crashes, so a switch intent forces the spawn-in
+		-- even when spawn_in_workspace is false. Full spawn × switch matrix (target not already
+		-- live; the live case is the guard below); (FIX) marks the two combos that changed:
+		--
+		--   spawn_in_workspace | switch_workspace | spawn into target? | result
+		--   -------------------+------------------+--------------------+-------------------------
+		--   true (default)     | true / unset     | yes                | spawn into target, switch to it
+		--   true               | false            | yes                | spawn into target, stay put   (FIX: was rename → 2 workspaces aliased)
+		--   false              | false / unset    | no                 | spawn into current, rename current → target (legacy)
+		--   false              | true             | yes                | spawn into target, switch     (FIX: was spawn-into-current then switch-empty → crash)
+		local spawn_window_in_workspace = opts.spawn_in_workspace or should_switch_workspace
+
+		-- Already-live workspace: switch to it (when should_switch_workspace) rather than
+		-- restore a duplicate window set that the next save would persist. Safe on
+		-- gui-startup: the mux is empty when it fires, so nothing matches here.
 		local target = workspace_state.workspace
 		if target and target ~= "" then
 			for _, mux_win in ipairs(wezterm.mux.all_windows()) do
 				if mux_win:get_workspace() == target then
-					if should_switch then
+					if should_switch_workspace then
 						wezterm.mux.set_active_workspace(target)
 					end
 					return true
@@ -76,7 +89,7 @@ function pub.restore_workspace(workspace_state, opts)
 					height = window_state.size.rows,
 					cwd = window_state.tabs[1].pane_tree.cwd,
 				}
-				if opts.spawn_in_workspace then
+				if spawn_window_in_workspace then
 					spawn_window_args.workspace = workspace_state.workspace
 				end
 				opts.tab, opts.pane, opts.window = wezterm.mux.spawn_window(spawn_window_args)
@@ -97,14 +110,17 @@ function pub.restore_workspace(workspace_state, opts)
 
 		-- Switch the active workspace to the one just restored, so the user actually
 		-- lands in it rather than staying in (or being dropped into) another workspace.
-		-- should_switch was resolved above, next to the already-live guard.
+		-- should_switch_workspace was resolved above, next to the already-live guard.
 		if workspace_state.workspace and workspace_state.workspace ~= "" then
-			if should_switch then
+			if should_switch_workspace then
 				wezterm.mux.set_active_workspace(workspace_state.workspace)
-			else
-				-- Not switching (legacy `spawn_in_workspace = false`): keep the user in
-				-- their current workspace but rename it to the restored name, so it no
-				-- longer shows up as "default".
+			elseif not spawn_window_in_workspace then
+				-- Windows landed in the current workspace (spawn_in_workspace=false and not
+				-- switching): rename it to the restored name so it no longer shows up as
+				-- "default". Gated on `not spawn_window_in_workspace`, not on
+				-- `not should_switch_workspace`: when the windows were spawned into the target
+				-- instead (spawn_in_workspace=true, switch=false) a rename would alias two
+				-- workspaces to the same name.
 				wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), workspace_state.workspace)
 			end
 		end
