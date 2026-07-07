@@ -79,6 +79,19 @@ busted                          # default: same as --run=unit
 # described in README.md and verify state round-trips correctly.
 ```
 
+### Live-debugging a real WezTerm (`run-wezterm` skill)
+
+Unit tests run against a `wezterm` mock. To exercise uncommitted `plugin/`
+changes in a real wezterm-gui — a genuine save → restart → restore round trip —
+use the project skill at `.claude/skills/run-wezterm/` (invoke via `/run-wezterm`
+or `/run`). It launches a throwaway, isolated gui, copies your local `plugin/`
+into the wezterm plugin cache, drives it with `wezterm cli`, and archives each
+run's evidence (state JSON, gui-log snippets, the diff under test) into an
+ephemeral `$TMPDIR` report. It targets the test instance by its per-process mux
+socket (not `--class`, which does not isolate) and redirects saves to a scratch
+dir so it never touches your real saved state. See the skill's `SKILL.md` for the
+full workflow.
+
 CI (`.github/workflows/ci.yml`) has three jobs that must stay green on every PR:
 
 - `lint` — stylua, luacheck, and lua-ls over `plugin/`.
