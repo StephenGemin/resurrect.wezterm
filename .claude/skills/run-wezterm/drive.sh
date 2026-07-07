@@ -36,6 +36,19 @@ sock_for() { echo "$HOME/.local/share/wezterm/gui-sock-$1"; }
 run_dir()  { [ -f "$CURRENT" ] && cat "$CURRENT" || { echo "no active run (start one: $0 start)" >&2; exit 1; }; }
 cur_pid()  { local r; r="$(run_dir)"; cat "$r/gui.pid"; }
 
+# Fire the test-config.lua user-var-changed hook by having a pane's shell emit an
+# OSC SetUserVar (base64 value). This drives the plugin's real restore/delete API
+# without the fuzzy picker, which `wezterm cli` cannot navigate. See SKILL.md.
+emit_uservar() {
+	local name="$1" b64 sock pane
+	b64="$(printf '%s' "$2" | base64)"
+	sock="$(sock_for "$(cur_pid)")"
+	pane="$(WEZTERM_UNIX_SOCKET="$sock" wezterm cli list --format json \
+		| python3 -c 'import json,sys;print(json.load(sys.stdin)[0]["pane_id"])')"
+	WEZTERM_UNIX_SOCKET="$sock" wezterm cli send-text --pane-id "$pane" --no-paste \
+		"printf '\033]1337;SetUserVar=$name=$b64\a'"$'\n'
+}
+
 copy_plugin() {
 	[ -d "$CACHE_DIR/plugin/resurrect" ] || { echo "plugin cache not found: $CACHE_DIR" >&2; exit 1; }
 	cp "$REPO_DIR/plugin/init.lua" "$REPO_DIR/plugin/types.lua" "$CACHE_DIR/plugin/"
@@ -174,6 +187,18 @@ restart)
 	echo "killed $pid; relaunching to trigger gui-startup restore..."
 	launch "$RUN"
 	;;
+restore)
+	shift
+	[ -n "${1:-}" ] || { echo "usage: $0 restore <workspace>" >&2; exit 1; }
+	emit_uservar resurrect_test_restore "$1"
+	echo "fired restore hook for '$1' (non-live workspace -> spawns; live -> switch-to-live guard, no spawn)"
+	;;
+delete)
+	shift
+	[ -n "${1:-}" ] || { echo "usage: $0 delete <workspace>" >&2; exit 1; }
+	emit_uservar resurrect_test_delete "$1"
+	echo "fired delete hook for '$1' (target a NON-active workspace or periodic-save re-creates its JSON)"
+	;;
 sock)
 	sock_for "$(cur_pid)"
 	;;
@@ -196,7 +221,7 @@ stop)
 	echo "archive (ephemeral, under \$TMPDIR): $RUN"
 	;;
 *)
-	echo "usage: $0 {start|snapshot [label]|restart|cli <args>|sock|report|stop}" >&2
+	echo "usage: $0 {start|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|sock|report|stop}" >&2
 	exit 1
 	;;
 esac

@@ -28,6 +28,8 @@ cd .claude/skills/run-wezterm
 ./drive.sh cli list         # run any `wezterm cli` subcommand against ONLY the test instance
 ./drive.sh snapshot <label> # capture cli-list + gui-log into the run archive at a named point
 ./drive.sh restart          # kill + relaunch -> fires gui-startup restore from saved state
+./drive.sh restore <ws>     # headless fuzzy-restore <ws> into the LIVE instance (no picker)
+./drive.sh delete <ws>      # headless fuzzy-delete <ws>'s saved state (no picker)
 ./drive.sh report           # (re)generate report.md from the archive; prints its path
 ./drive.sh stop             # snapshot + report, kill the gui, `git checkout -- .` the cache
 ```
@@ -150,25 +152,42 @@ Call `report` any time to regenerate after editing `verdict.md`.
   ```
   Images can't be grepped/asserted on — prefer `get-text` for anything automatable.
 
-## Limitations — what this skill can't drive
+## Driving the picker flows (restore / delete) without the fuzzy finder
 
 `wezterm cli` (20240203) has **no key-event verb** and cannot navigate an
-`InputSelector`, so the plugin's **interactive picker flows are not drivable** by this
-skill:
+`InputSelector`, so the plugin's keybinding + picker flows can't be driven through
+their UI:
 
 - create workspace — `Alt+Shift+N` (`workspace_state.create_workspace_action`, name prompt)
 - fuzzy restore/switch — `Alt+R` (`fuzzy_loader.restore_action`)
 - fuzzy delete — `Alt+D` (`fuzzy_loader.delete_action`)
 
-This skill drives the **save → restart → restore round trip** (cli-built layouts +
-gui-startup restore), which is a different code path from those UI flows. To exercise
-the underlying restore/delete/save *logic* without the picker, **bypass** it by calling
-the already-public API directly — e.g. a `wezterm.on("user-var-changed", …)` hook in
-`test-config.lua` that calls `workspace_state.restore_workspace(load_state(name,
-"workspace"), …)` / `state_manager.delete_state("workspace/"..name..".json")`,
-triggered from the driver via a shell-emitted OSC `SetUserVar`. That bypasses the
-fuzzy finder; it does **not** drive it. Note: restoring the currently-live workspace
-hits the switch-to-live guard (no spawn) — target a non-live workspace to see a restore.
+The picker, though, is a thin name-selection wrapper over already-public API. So
+`test-config.lua` carries a **test-only** `user-var-changed` hook that calls the
+**same** functions the picker's callback calls — bypassing only the selection UI, not
+the restore/delete logic. `drive.sh restore <ws>` / `delete <ws>` trigger it by making
+a pane's shell emit an OSC `SetUserVar` (the value is base64; it must reach the pane's
+**stdout**, which is how shell integration sets user vars):
+
+```sh
+./drive.sh restore <ws>   # -> workspace_state.restore_workspace(load_state(<ws>,"workspace"), <picker opts>)
+./drive.sh delete <ws>    # -> state_manager.delete_state("workspace/<ws>.json")
+```
+
+This is the one path a restart→gui-startup round trip does **not** cover: a
+**live-switch restore** (`Alt+R` into a running instance), exactly what `#61/#64`
+touched. What to know when using it:
+
+- **Restore a NON-live workspace to see a spawn.** Restoring the currently-live
+  workspace hits the `#61` switch-to-live guard (switches instead of duplicating —
+  correct, but no new window). Build a second workspace, switch away, then restore.
+- **Delete a NON-active workspace.** Periodic-save (10s) re-creates the active
+  workspace's JSON right after you delete it.
+- This bypasses the fuzzy finder; it does **not** test it. The filtering / selection /
+  rendering UI glue is out of scope here — cover that with a targeted unit test, not by
+  driving the overlay.
+- Hook scope is **workspace** restore/delete (the skill's round-trip unit). Window/tab
+  picker restores aren't wired up; add a branch to the hook if a test needs them.
 
 ## Cleanup / safety
 
