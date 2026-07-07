@@ -27,7 +27,7 @@ the same options via an `opts.fuzzy_load_opts` sub-table:
 ```
 
 Example: showing only window states, with the last-saved date visible (used by "Option D" —
-restore into the current window — in [`advanced-setup.lua`](./advanced-setup.lua) via
+restore into the current window — in [`advanced_setup.lua`](./advanced_setup.lua) via
 `ignore_workspaces`/`ignore_tabs`):
 
 ```lua

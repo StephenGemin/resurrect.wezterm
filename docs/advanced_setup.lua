@@ -9,9 +9,12 @@
 -- keybinding -- never wire up more than one of them at once.
 --
 -- Drop this in as its own module (e.g. resurrect_plugin.lua) and from your
--- wezterm.lua: local resurrect_plugin = require('resurrect_plugin')
---              resurrect_plugin.setup(config)
---              -- merge resurrect_plugin.keys into config.keys
+-- wezterm.lua:
+--   local resurrect_plugin = require('resurrect_plugin')
+--   resurrect_plugin.setup(config)
+--   for _, key in ipairs(resurrect_plugin.keys) do
+--     table.insert(config.keys, key)
+--   end
 -- =============================================================================
 
 local wezterm = require('wezterm')
@@ -56,8 +59,8 @@ function M.setup(config)
 
 	-- --- Safe-restore process allowlist ----------------------------------
 
-	-- Extend the built-in allowlist (vi, vim, nvim, emacs, man, less, more,
-	-- top, htop, irssi, weechat, mutt):
+	-- Extend the built-in allowlist (see README's "Configuring the safe-restore process
+	-- list" section for the current defaults):
 	resurrect.pane_tree.add_safe_restore_processes({ 'lazygit', 'k9s' })
 	-- ...or fully replace it (pass {} to disable process relaunch entirely):
 	-- resurrect.pane_tree.set_safe_restore_processes({ 'vim', 'nvim' })
@@ -109,7 +112,7 @@ M.keys = {
 	},
 
 	-- Option B: restore into the current workspace without switching
-	-- (MLFlexer-equivalent behavior). See docs/migrating_from_mlflexer.md.
+	-- (matches the original project's behavior). See docs/migrating_from_upstream.md.
 	-- {
 	--   key = 'r',
 	--   mods = 'ALT',

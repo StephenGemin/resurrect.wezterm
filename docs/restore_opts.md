@@ -31,7 +31,7 @@ the window's active tab as the first saved tab's contents (unless `close_open_ta
 which closes the window's other tabs instead); within that, it reuses the active pane as the
 first saved pane (unless `close_open_panes` is set, which closes the tab's other panes
 instead). This is what powers restoring into your current window — see "Option D" in
-[`advanced-setup.lua`](./advanced-setup.lua).
+[`advanced_setup.lua`](./advanced_setup.lua).
 
 Passing `tab` or `pane` directly (without `window`) is for narrower cases — e.g. reusing a
 specific already-running tab or pane you already have a handle to, rather than the whole

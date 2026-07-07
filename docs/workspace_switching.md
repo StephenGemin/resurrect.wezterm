@@ -1,7 +1,22 @@
 # Workspace switching: the live/not-live model
 
 This explains how `restore_workspace` decides whether to switch you into a workspace, and
-why loading an already-open workspace doesn't re-apply the saved snapshot on top of it.
+why loading an already-open workspace doesn't re-apply the saved snapshot on top of it. This is
+arguably the fork's biggest behavioral divergence from the original resurrect.wezterm: the
+original `restore_workspace` never switched the active workspace on its own — restoring only
+populated a workspace's saved contents, leaving it to the caller to switch first if they wanted
+to land in it. This fork inverts that default so `restore_workspace` switches you into the
+restored workspace automatically, and the live/saved-state model and already-live guard
+documented below exist to make that default behave well (without the guard, restoring an
+already-open workspace would just spawn a duplicate set of windows on top of it — the bug
+[PR #61](https://github.com/StephenGemin/resurrect.wezterm/pull/61) fixed).
+
+The change followed recurring feedback on the original project's issue tracker (issues #67,
+#70, #73, #114) asking to land *in* the restored workspace rather than just have it populated
+in the background, while still honoring a non-intrusiveness principle the original project had
+already committed to (issue #67: don't close tabs/panes a user didn't ask to close). Nothing
+was removed to make this the default — see [migrating_from_upstream.md](./migrating_from_upstream.md)
+for the full behavioral diff and how to opt back into the original behavior.
 
 ## Live vs. saved state
 

@@ -11,7 +11,7 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
   - [Features](#features)
   - [Basic Setup](#basic-setup)
     - [Setup Options](#setup-options)
-  - [Migrating from MLFlexer's resurrect.wezterm](#migrating_from_mlflexers-resurrectwezterm)
+  - [Migrating from the original resurrect.wezterm](#migrating-from-the-original-resurrectwezterm)
   - [Advanced Setup](#advanced-setup)
     - [Creating a workspace](#creating-a-workspace)
     - [Saving state](#saving-state)
@@ -113,18 +113,23 @@ When `keybindings = true`, the following bindings are added:
 To define your own keybindings, set `keybindings = false` and see [Saving state](#saving-state),
 [Restoring state](#restoring-state), and [Deleting state](#deleting-state) in Advanced Setup.
 
-## Migrating from MLFlexer's resurrect.wezterm
+## Migrating from the original resurrect.wezterm
 
-This project is a fork of [MLFlexer's original `resurrect.wezterm`](https://github.com/MLFlexer/resurrect.wezterm),
-which is now archived. The API is largely unchanged, but the default state-file location
-moved and a few behaviors differ (e.g. restore switching to the workspace by default) — see
-[`docs/migrating_from_mlflexer.md`](docs/migrating_from_mlflexer.md) for the full migration
-steps and behavioral differences.
+[MLFlexer/resurrect.wezterm](https://github.com/MLFlexer/resurrect.wezterm) is archived. The API in
+this fork is largely unchanged, but the default state-file location moved and a few behaviors
+differ (e.g. restore switching to the workspace by default) — see
+[`docs/migrating_from_upstream.md`](docs/migrating_from_upstream.md) for the full migration
+steps and behavioral differences. Restore switching to the workspace by default is this fork's
+biggest divergence from the original — see [`docs/workspace_switching.md`](docs/workspace_switching.md)
+for the live/saved-state model behind it. If you also use
+[smart_workspace_switcher.wezterm](https://github.com/MLFlexer/smart_workspace_switcher.wezterm),
+see [`docs/smart_workspace_switcher.md`](docs/smart_workspace_switcher.md) for how to wire the two
+together.
 
 ## Advanced Setup
 
 If you need fine-grained control over each component, configure them individually instead of
-using `setup()`. See [`docs/advanced-setup.lua`](docs/advanced-setup.lua) for a complete,
+using `setup()`. See [`docs/advanced_setup.lua`](docs/advanced_setup.lua) for a complete,
 drop-in config file that wires all of this up manually. It covers:
 
 - Saving: `event_driven_save()` (structure changes + focus loss) and `periodic_save()` as a
@@ -218,12 +223,12 @@ resurrect.setup(config, {
 > `add` is ignored.
 
 To call the underlying functions directly instead of going through `setup()`, see the
-safe-restore-process section of [`docs/advanced-setup.lua`](docs/advanced-setup.lua).
+safe-restore-process section of [`docs/advanced_setup.lua`](docs/advanced_setup.lua).
 
 #### Restoring into the current window
 
 To restore a window state into the current window instead of spawning a new one, pass
-`close_open_tabs` — see "Option D" in [`docs/advanced-setup.lua`](docs/advanced-setup.lua)
+`close_open_tabs` — see "Option D" in [`docs/advanced_setup.lua`](docs/advanced_setup.lua)
 for a complete example.
 
 #### Windows not resizing correctly
@@ -236,7 +241,7 @@ To avoid this, set `resize_window = false` in your `restore_opts` (see
 #### Manual dispatch
 
 If you need full control over how each state type is restored, call `fuzzy_load` directly —
-see "Option C" in [`docs/advanced-setup.lua`](docs/advanced-setup.lua) for a complete
+see "Option C" in [`docs/advanced_setup.lua`](docs/advanced_setup.lua) for a complete
 example that dispatches on workspace/window/tab.
 
 ### Deleting state
@@ -248,7 +253,7 @@ description, etc.
 #### Manual dispatch
 
 For full control over the delete picker (custom title, description, etc.) instead of using
-`delete_action()`, see "Option B" (Delete) in [`docs/advanced-setup.lua`](docs/advanced-setup.lua).
+`delete_action()`, see "Option B" (Delete) in [`docs/advanced_setup.lua`](docs/advanced_setup.lua).
 
 ### Encryption (optional, recommended)
 
@@ -409,7 +414,7 @@ This plugin emits the following events that you can use for your own callback fu
 - `resurrect.workspace_state.restore_workspace.finished`
 - `resurrect.workspace_state.restore_workspace.start`
 
-See the toast-notification section of [`docs/advanced-setup.lua`](docs/advanced-setup.lua)
+See the toast-notification section of [`docs/advanced_setup.lua`](docs/advanced_setup.lua)
 for an example that sends a toast notification on selected events, suppressing the noisy
 `periodic_save()` write-finished event.
 

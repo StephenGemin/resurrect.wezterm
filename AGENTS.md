@@ -35,15 +35,15 @@ spec/
   unit/                      unit tests (busted --run=unit)
   integration/               integration tests; require lunajson (busted --run=integration)
 scripts/
-  migrate-from-mlflexer.sh   copies old MLFlexer state files into this fork's default dir
-                             (macOS, Linux, Windows via Git Bash)
+  migrate-from-mlflexer.sh   copies state files from the original project's layout into
+                             this fork's default dir (macOS, Linux, Windows via Git Bash)
 docs/
   workspace_switching.md     live/not-live model, spawn_in_workspace/switch_workspace behavior
-  migrating_from_mlflexer.md data migration steps + behavioral differences from MLFlexer
-  smart_workspace_switcher.md integration notes for MLFlexer's (archived) workspace switcher
+  migrating_from_upstream.md data migration steps + behavioral differences from the original
+  smart_workspace_switcher.md integration notes for the (archived) companion workspace switcher
   restore_opts.md            full restore_opts reference table
   fuzzy_load_opts.md         full fuzzy_load_opts reference table
-  advanced-setup.lua         complete drop-in config wiring every component manually
+  advanced_setup.lua         complete drop-in config wiring every component manually
 README.md
 AGENTS.md                    (this file)
 CLAUDE.md                    AI assistant guidance
