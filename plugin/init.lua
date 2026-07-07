@@ -77,7 +77,7 @@ function pub.setup(config, opts)
 	-- Default for restore_workspace's switch_workspace opt (per-call opt still wins).
 	-- Startup restore always switches regardless; this governs mid-session restores.
 	if opts.switch_workspace ~= nil then
-		pub.workspace_state.switch_workspace_default = opts.switch_workspace
+		pub.workspace_state.set_switch_workspace_default(opts.switch_workspace)
 	end
 
 	-- Safe-restore process allowlist: extend or replace the defaults

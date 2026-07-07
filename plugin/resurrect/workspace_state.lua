@@ -4,10 +4,17 @@ local state_manager_mod = require("resurrect.state_manager")
 
 local pub = {}
 
--- Default for `switch_workspace` when a caller leaves it unset, settable via
--- setup({ switch_workspace = ... }). nil means "fall back to spawn_in_workspace"
--- (the coupled default). A per-call opts.switch_workspace always wins over this.
-pub.switch_workspace_default = nil
+-- Default for `switch_workspace` when a caller leaves it unset. nil means "fall back
+-- to spawn_in_workspace" (the coupled default). A per-call opts.switch_workspace
+-- always wins over this. Set via pub.set_switch_workspace_default(), not directly.
+local switch_workspace_default = nil
+
+---Set the default for restore_workspace's `switch_workspace` opt when a caller
+---leaves it unset. Used by resurrect.setup({ switch_workspace = ... }).
+---@param value boolean?
+function pub.set_switch_workspace_default(value)
+	switch_workspace_default = value
+end
 
 ---restore workspace state
 ---@param workspace_state workspace_state
@@ -35,11 +42,11 @@ function pub.restore_workspace(workspace_state, opts)
 
 		-- Whether to switch the active workspace to the restored one. Resolution, in
 		-- precedence order: the per-call `switch_workspace` opt, then the setup() default
-		-- (`pub.switch_workspace_default`), then `spawn_in_workspace` (the coupled default).
+		-- (switch_workspace_default), then `spawn_in_workspace` (the coupled default).
 		-- Each fallback keys on `== nil` so an explicit `false` at any level is honoured.
 		local should_switch_workspace = opts.switch_workspace
 		if should_switch_workspace == nil then
-			should_switch_workspace = pub.switch_workspace_default
+			should_switch_workspace = switch_workspace_default
 		end
 		if should_switch_workspace == nil then
 			should_switch_workspace = opts.spawn_in_workspace
