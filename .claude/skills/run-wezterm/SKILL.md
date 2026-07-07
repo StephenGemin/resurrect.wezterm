@@ -23,24 +23,31 @@ instance you MUST point `WEZTERM_UNIX_SOCKET` at its own `gui-sock-<pid>`.
 
 ```sh
 cd .claude/skills/run-wezterm
-./drive.sh start          # copies plugin/ into the cache, launches isolated gui,
-                          # prints pid / socket / gui-log / state-dir
-./drive.sh cli list       # run any `wezterm cli` subcommand against ONLY the test instance
-./drive.sh restart        # kill + relaunch -> fires gui-startup restore from saved state
-./drive.sh stop           # kill the test gui AND `git checkout -- .` the plugin cache
+./drive.sh start            # copies plugin/ into the cache, opens a fresh run archive,
+                            # launches isolated gui, prints pid / socket / gui-log / run-dir
+./drive.sh cli list         # run any `wezterm cli` subcommand against ONLY the test instance
+./drive.sh snapshot <label> # capture cli-list + gui-log into the run archive at a named point
+./drive.sh restart          # kill + relaunch -> fires gui-startup restore from saved state
+./drive.sh report           # (re)generate report.md from the archive; prints its path
+./drive.sh stop             # snapshot + report, kill the gui, `git checkout -- .` the cache
 ```
 
 `drive.sh` guarantees isolation two ways: it targets the test gui by its own
 socket, and `test-config.lua` calls `change_state_save_dir()` to redirect all
-saves into a scratch dir (`$TMPDIR/resurrect-wezterm-debug/state/`) so it never
-writes the user's real `~/Library/Application Support/wezterm/resurrect/`.
+saves into a per-run scratch dir so it never writes the user's real
+`~/Library/Application Support/wezterm/resurrect/`.
+
+Every run gets an **ephemeral archive** under `$TMPDIR` (auto-reaped by the OS —
+no manual cleanup) at `…/resurrect-wezterm-debug/runs/<timestamp>/`, symlinked as
+`runs/latest`. It holds the saved state JSON, per-pid gui-log copies, `cli list`
+snapshots, the uncommitted diff under test, and the generated `report.md`.
 
 ## A full round trip (what to actually do)
 
 ```sh
 cd .claude/skills/run-wezterm
 ./drive.sh start
-STATE="${TMPDIR:-/tmp}/resurrect-wezterm-debug/state"
+RUN=$(readlink "${TMPDIR:-/tmp}/resurrect-wezterm-debug/runs/latest"); STATE="$RUN/state"
 
 # 1. Build a layout with recognizable markers. cli send-text goes to the shell,
 #    so echo a unique token you can grep for after restore.
@@ -63,12 +70,39 @@ for p in $(./drive.sh cli list --format json | python3 -c 'import json,sys;[prin
   ./drive.sh cli get-text --pane-id "$p" --start-line -100 | grep -o 'MARK_[A-Z]*'
 done
 
-./drive.sh stop
+# 5. Record the judgment, then let stop assemble the report and print its path.
+cat > "$RUN/verdict.md" <<'MD'
+**PASS** — both marker panes restored after restart.
+- <what you built / what you waited on / which evidence you checked>
+MD
+./drive.sh stop   # prints: report: <run>/report.md
 ```
 
 A clean pass looks like: each `MARK_*` reappears after `restart`, and the gui log
 (below) shows `restoring workspace '<name>' on gui-startup` followed by
 `resurrect.restore_baseline: pane N registered replay ... settled`.
+
+## The run report
+
+`stop` (and `report`) writes `report.md` into the run archive and prints its path
+— that path is the skill's final output; hand it to the user. The report has a
+fixed shape so runs read the same every time:
+
+- **Verdict & reasoning** — folded verbatim from `$RUN/verdict.md`, which YOU
+  write: `PASS` / `FAIL` / `INCONCLUSIVE` plus how you decided. `drive.sh` never
+  guesses the verdict; if `verdict.md` is absent the section says so.
+- **Environment & change under test** — wezterm version, git branch/rev, and the
+  `--stat` of the uncommitted `plugin/` diff this run exercised (full diff in
+  `evidence/plugin-under-test.diff`). If the tree is clean it says the run only
+  checked the harness, not a change.
+- **Restore evidence** — the actual `resurrect …` gui-log lines used to judge the
+  run (gui-startup restore, `restore_baseline` replay/settle, any error/skip).
+- **Saved state summary** — each state JSON with its captured-text-node count, and
+  where `current_state` points.
+- **Evidence index** — every file in the archive, for deeper digging.
+
+Write `verdict.md` **before** `stop`/`report` so it lands in the generated file.
+Call `report` any time to regenerate after editing `verdict.md`.
 
 ## Reading evidence
 
@@ -122,5 +156,5 @@ A clean pass looks like: each `MARK_*` reappears after `restart`, and the gui lo
 the plugin cache clone to drop the hand-copied files. **Never push or commit to
 propagate a change into the cache** — the cache only reflects GitHub after a push
 + plugin update, and `wezterm.plugin.update_all()` would clobber hand-copied
-files anyway. The scratch state dir is left for inspection; remove it with
-`rm -rf "${TMPDIR:-/tmp}/resurrect-wezterm-debug"`.
+files anyway. Run archives live under `$TMPDIR` and are reaped by the OS, so no
+manual cleanup is needed; delete one early with `rm -rf "$RUN"` if you want.
