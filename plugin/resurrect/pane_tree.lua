@@ -367,10 +367,17 @@ function pub.default_on_pane_restore(pane_tree)
 		-- Kept as a defensive pass for state files saved before capture-time
 		-- trimming existed; a no-op for freshly saved state.
 		local text = utils.strip_trailing_blank_rows(pane_tree.text)
-		pane:inject_output(text)
+		-- Append the newline to the injected output instead of sending it to the
+		-- shell. The shell already paints its own fresh prompt on startup; the
+		-- newline is only needed to leave the cursor at column 0 so that prompt
+		-- lands on a clean line below the replay. (Without it the shell prints a
+		-- reverse-video partial-line "%" marker over the last replayed row.)
+		-- Sending "\r\n" to the shell instead made it accept TWO empty lines -- CR
+		-- and LF each fire accept-line -- drawing two spurious prompt blocks per
+		-- restore on top of the startup one. register() gets the un-appended text
+		-- so the persisted baseline stays exactly what was replayed.
+		pane:inject_output(text .. "\r\n")
 		restore_baseline.register(pane, text)
-		-- Send newline to trigger a fresh shell prompt at the correct position
-		pane:send_text("\r\n")
 	end
 end
 
