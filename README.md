@@ -11,19 +11,15 @@ Resurrect your terminal environment!⚰️ A plugin to save the state of your wi
   - [Features](#features)
   - [Basic Setup](#basic-setup)
     - [Setup Options](#setup-options)
-  - [Migrating from MLFlexer's resurrect.wezterm](#migrating-from-mlflexers-resurrectwezterm)
-    - [Migrating state files manually (optional)](#migrating-state-files-manually-optional)
+  - [Migrating from the original resurrect.wezterm](#migrating-from-the-original-resurrectwezterm)
   - [Advanced Setup](#advanced-setup)
-    - [Resurrecting on startup](#resurrecting-on-startup)
     - [Creating a workspace](#creating-a-workspace)
     - [Saving state](#saving-state)
     - [Restoring state](#restoring-state)
-      - [restore\_opts](#restore_opts)
       - [Configuring the safe-restore process list](#configuring-the-safe-restore-process-list)
       - [Restoring into the current window](#restoring-into-the-current-window)
       - [Windows not resizing correctly](#windows-not-resizing-correctly)
       - [Manual dispatch](#manual-dispatch)
-      - [fuzzy\_load opts](#fuzzy_load-opts)
     - [Deleting state](#deleting-state)
       - [Manual dispatch](#manual-dispatch-1)
     - [Encryption (optional, recommended)](#encryption-optional-recommended)
@@ -117,123 +113,48 @@ When `keybindings = true`, the following bindings are added:
 To define your own keybindings, set `keybindings = false` and see [Saving state](#saving-state),
 [Restoring state](#restoring-state), and [Deleting state](#deleting-state) in Advanced Setup.
 
-## Migrating from MLFlexer's resurrect.wezterm
+## Migrating from the original resurrect.wezterm
 
-This project is a fork of [MLFlexer's original `resurrect.wezterm`](https://github.com/MLFlexer/resurrect.wezterm),
-which is now archived. The API is unchanged, but the default location where state files
-are saved has moved: it used to live inside the plugin's own git-clone directory, and now
-lives in a fixed, OS-standard data directory instead. That means **swapping only the
-`require()` URL will not bring your old saved sessions forward** — they need to be copied
-over once.
-
-1. *(Optional — only if you want your old saved sessions available here)* run the
-   migration script to copy your old state files into the new default directory. It
-   only copies files — it never touches your `wezterm.lua` or deletes anything, and
-   never overwrites existing files at the destination:
-
-   ```sh
-   bash scripts/migrate-from-mlflexer.sh
-   ```
-
-   On Windows, run this from a Git Bash terminal (ships with
-   [Git for Windows](https://git-scm.com/downloads/win)) — the script fails with a clear
-   error rather than doing the wrong thing if Git Bash isn't available. If something
-   looks off, its output is meant to be pasted directly into a GitHub issue.
-
-2. Update the require URL in your `wezterm.lua`:
-
-   ```lua
-   local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
-   ```
-
-3. Restart WezTerm (or run `wezterm.reload_configuration()`).
-
-4. Once you've confirmed your old sessions restore correctly, you can delete the old
-   MLFlexer plugin directory manually.
-
-### Migrating state files manually (optional)
-
-Prefer not to run the script? Find your old plugin clone dir via `wezterm.plugin.list()`
-in the Wezterm Debug Overlay (`Ctrl + Shift + L`), then copy its state files across
-yourself:
-
-| OS | Old location (inside the MLFlexer plugin clone) | New location |
-|----|---------------------------------------------------|--------------|
-| macOS | `<plugin clone dir>/state/` | `~/Library/Application Support/wezterm/resurrect/` |
-| Linux | `<plugin clone dir>/state/` | `$XDG_DATA_HOME/wezterm/resurrect/` (or `~/.local/share/wezterm/resurrect/`) |
-| Windows | `<plugin clone dir>\state\` | `%APPDATA%\wezterm\resurrect\` |
-
-The saved-state JSON schema is unchanged, so copied files load without any conversion.
+[MLFlexer/resurrect.wezterm](https://github.com/MLFlexer/resurrect.wezterm) is archived. The API in
+this fork is largely unchanged, but the default state-file location moved and a few behaviors
+differ (e.g. restore switching to the workspace by default) — see
+[`docs/migrating_from_upstream.md`](docs/migrating_from_upstream.md) for the full migration
+steps and behavioral differences. Restore switching to the workspace by default is this fork's
+biggest divergence from the original — see [`docs/workspace_switching.md`](docs/workspace_switching.md)
+for the live/saved-state model behind it. If you also use
+[smart_workspace_switcher.wezterm](https://github.com/MLFlexer/smart_workspace_switcher.wezterm),
+see [`docs/smart_workspace_switcher.md`](docs/smart_workspace_switcher.md) for how to wire the two
+together.
 
 ## Advanced Setup
 
-If you need fine-grained control over each component, you can configure them individually instead of using `setup()`.
+If you need fine-grained control over each component, configure them individually instead of
+using `setup()`. See [`docs/advanced_setup.lua`](docs/advanced_setup.lua) for a complete,
+drop-in config file that wires all of this up manually. It covers:
 
-### Resurrecting on startup
+- Saving: `event_driven_save()` (structure changes + focus loss) and `periodic_save()` as a
+  safety net
+- Restoring on startup: `wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)`
+- The safe-restore process allowlist
+- Keybindings: create workspace, save workspace/window/tab, restore (4 variants — see below),
+  delete (2 variants)
+- Status bar save indicator + toast notifications on plugin events (optional, at the bottom of
+  the file)
 
-Resume from your last session automatically by adding this to your config:
-
-```lua
-wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
-```
-
-This reads the current state file written by `periodic_save` and `event_driven_save`
-whenever `save_workspaces = true`. `setup()` wires this up automatically — only add
-it manually if you are not using `setup()`.
+The sections below cover what's worth knowing beyond what's already in that file.
 
 ### Creating a workspace
 
-Bind `create_workspace_action()` to prompt for a name and switch to (or create) that
-workspace — a thin wrapper around wezterm's own `PromptInputLine` +
-`SwitchToWorkspace` pattern:
-
-```lua
-config.keys = {
-  -- ...
-  {
-    key = "N",
-    mods = "ALT|SHIFT",
-    action = resurrect.workspace_state.create_workspace_action(),
-  },
-}
-```
-
-This only switches the active workspace; it does not save anything. Save the new
-workspace's state with `save_workspace_action()` (below) once you're in it.
+`create_workspace_action()` is a thin wrapper around wezterm's own `PromptInputLine` +
+`SwitchToWorkspace` pattern; it only switches the active workspace and does not save anything.
+Save the new workspace's state with `save_workspace_action()` once you're in it.
 
 ### Saving state
 
-Bind save actions to keys. Each action function takes no arguments — the naming prompt
-for windows/tabs and silent re-save behaviour are handled automatically (see the note
-below). Workspaces are never prompted for a name on save; see [Creating a workspace](#creating-a-workspace).
-
-```lua
-local wezterm = require("wezterm")
-local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
-
-config.keys = {
-  -- ...
-  {
-    key = "w",
-    mods = "ALT",
-    action = resurrect.workspace_state.save_workspace_action(),
-  },
-  {
-    key = "W",
-    mods = "ALT",
-    action = resurrect.window_state.save_window_action(),
-  },
-  {
-    key = "T",
-    mods = "ALT",
-    action = resurrect.tab_state.save_tab_action(),
-  },
-}
-```
-
 On the first save of a window or tab you are prompted for a name; subsequent saves are
-silent. Saving to a name already in use overwrites the existing file. Once named, a
-window or tab is picked up automatically by periodic and event-driven saves.
+silent. Saving to a name already in use overwrites the existing file. Once named, a window or
+tab is picked up automatically by periodic and event-driven saves. Workspaces are never
+prompted for a name on save — see [Creating a workspace](#creating-a-workspace).
 
 ### Restoring state
 
@@ -252,11 +173,13 @@ config.keys = {
 }
 ```
 
-`restore_action` accepts `restore_opts` to control restore behaviour and an optional
-`fuzzy_load_opts` sub-table to customise the picker. Workspace and window restores always
-spawn a new GUI window and never modify the window the picker was invoked from, matching
-tmux-resurrect behaviour where restoring a session never touches your current context.
-Tab restores always add to the current window, since a tab can't exist outside of one.
+`restore_action` accepts `restore_opts` to control restore behaviour (see
+[`docs/restore_opts.md`](docs/restore_opts.md)) and an optional `fuzzy_load_opts` sub-table to
+customise the picker (see [`docs/fuzzy_load_opts.md`](docs/fuzzy_load_opts.md)). Workspace and
+window restores always spawn a new GUI window and never modify the window the picker was
+invoked from, matching tmux-resurrect behaviour where restoring a session never touches your
+current context. Tab restores always add to the current window, since a tab can't exist
+outside of one.
 
 ```lua
 action = resurrect.fuzzy_loader.restore_action({
@@ -266,51 +189,6 @@ action = resurrect.fuzzy_loader.restore_action({
   -- fuzzy_load_opts = { show_state_with_date = true },
 })
 ```
-
-#### restore_opts
-
-Options accepted by `restore_workspace`, `restore_window`, `restore_tab`, and `restore_action`:
-
-```lua
-{
-  spawn_in_workspace: boolean?, -- Restores the windows into the saved workspace; default: true. Set false to spawn into the "default" workspace
-  switch_workspace: boolean?,   -- Switch the active workspace to the restored one; defaults to the value of spawn_in_workspace
-  relative: boolean?,           -- Use relative size when restoring panes
-  absolute: boolean?,           -- Use absolute size when restoring panes
-  close_open_tabs: boolean?,    -- Closes all tabs which are open in the window, only restored tabs are left
-  close_open_panes: boolean?,   -- Closes all panes which are open in the tab, only keeping the panes to be restored
-  pane: Pane?,                  -- Restore in this pane
-  tab: MuxTab?,                 -- Restore in this tab
-  window: MuxWindow,            -- Restore in this window
-  resize_window: boolean?,      -- Resizes the window, default: true
-  on_pane_restore: fun(pane_tree: pane_tree), -- Function to restore panes; use resurrect.pane_tree.default_on_pane_restore
-}
-```
-
-> [!NOTE]
-> `spawn_in_workspace` defaults to `true`: the restored windows are spawned into the
-> saved workspace and the active workspace is switched to it. Set
-> `spawn_in_workspace = false` to keep the legacy behaviour, where the windows are
-> spawned into Wezterm's `"default"` workspace and the active workspace is **not**
-> changed — so you stay where you are and the restored windows appear under
-> `"default"`. By default `switch_workspace` follows `spawn_in_workspace`; set it
-> explicitly to switch (or not) independently of where the windows are spawned. Every
-> combination of the two is coherent: `{ spawn_in_workspace = true, switch_workspace =
-> false }` populates the named workspace in the background without moving you, and
-> `{ spawn_in_workspace = false, switch_workspace = true }` still lands you in the
-> restored workspace.
-
-> [!WARNING]
-> The `spawn_in_workspace = true` default is a breaking change from earlier versions,
-> which defaulted to `false`. If you relied on restored windows landing in the
-> `"default"` workspace, set `spawn_in_workspace = false` to restore the old behaviour.
-
-> [!NOTE]
-> If the workspace you restore already has live windows (e.g. you loaded it earlier in
-> the session), `restore_workspace` switches to it instead of spawning a duplicate set
-> of windows. The switch still honours `switch_workspace`, so `switch_workspace = false`
-> leaves you where you are. Restoring from the saved snapshot happens only when the
-> workspace isn't already live (e.g. on startup or first load).
 
 #### Configuring the safe-restore process list
 
@@ -344,134 +222,38 @@ resurrect.setup(config, {
 > Set only one of `add` or `replace`; if both are given, `replace` takes precedence and
 > `add` is ignored.
 
-Or call the underlying functions directly, without `setup()`:
-
-```lua
-resurrect.pane_tree.add_safe_restore_processes({ "lazygit", "k9s" })
--- or, to fully replace (pass {} to disable process relaunch entirely):
-resurrect.pane_tree.set_safe_restore_processes({ "vim", "nvim" })
-```
+To call the underlying functions directly instead of going through `setup()`, see the
+safe-restore-process section of [`docs/advanced_setup.lua`](docs/advanced_setup.lua).
 
 #### Restoring into the current window
 
-To restore a window state into the current window use `restore_window` with `close_open_tabs`:
-
-```lua
-local opts = {
-  close_open_tabs = true,
-  window = pane:window(),
-  on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
-  relative = true,
-  restore_text = true,
-}
-resurrect.window_state.restore_window(pane:window(), state, opts)
-```
-
-This will restore the state into the passed window and additionally close all
-the tabs in the window, such that only the restored tabs are visible after restoring.
+To restore a window state into the current window instead of spawning a new one, pass
+`close_open_tabs` — see "Option D" in [`docs/advanced_setup.lua`](docs/advanced_setup.lua)
+for a complete example.
 
 #### Windows not resizing correctly
 
 Some users has had problems with `window_decorations` and `window_padding`
 configuration options, which caused issues when resizing, see [comment](https://github.com/StephenGemin/resurrect.wezterm/issues/72#issuecomment-2582912347).
-To avoid this, set `resize_window = false` in your `restore_opts`.
+To avoid this, set `resize_window = false` in your `restore_opts` (see
+[`docs/restore_opts.md`](docs/restore_opts.md)).
 
 #### Manual dispatch
 
-If you need full control over how each state type is restored, call `fuzzy_load` directly:
-
-```lua
-action = wezterm.action_callback(function(win, pane)
-  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
-    local type = string.match(id, "^([^/]+)") -- match before '/'
-    id = string.match(id, "([^/]+)$") -- match after '/'
-    id = string.match(id, "(.+)%..+$") -- remove file extension
-    local opts = {
-      relative = true,
-      restore_text = true,
-      on_pane_restore = resurrect.pane_tree.default_on_pane_restore,
-    }
-    if type == "workspace" then
-      local state = resurrect.state_manager.load_state(id, "workspace")
-      -- Restores the windows into the saved workspace and switches you to it.
-      -- Pass `spawn_in_workspace = false` to spawn into "default" without switching.
-      resurrect.workspace_state.restore_workspace(state, opts)
-    elseif type == "window" then
-      local state = resurrect.state_manager.load_state(id, "window")
-      resurrect.window_state.restore_window(pane:window(), state, opts)
-    elseif type == "tab" then
-      local state = resurrect.state_manager.load_state(id, "tab")
-      local new_tab, new_pane = pane:window():spawn_tab({
-        cwd = state.pane_tree and state.pane_tree.cwd or nil,
-      })
-      opts.pane = new_pane
-      resurrect.tab_state.restore_tab(new_tab, state, opts)
-    end
-  end)
-end),
-```
-
-#### fuzzy_load opts
-
-`resurrect.fuzzy_loader.fuzzy_load(window, pane, callback, opts?)` accepts an optional
-`opts` argument to control picker appearance and filtering:
-
-```lua
----@alias fmt_fun fun(label: string): string
----@alias fuzzy_load_opts {
-  title: string,               -- dialog title, default: "Load state"
-  description: string,         -- description shown above the picker, default: "Select State to Load and press Enter = accept, Esc = cancel, / = filter"
-  fuzzy_description: string,   -- prompt shown in fuzzy mode; default: a nerdfonts.md_backup_restore glyph + "resurrect.wezterm · select state to restore: "
-  is_fuzzy: boolean,           -- enter directly in fuzzy mode, default: true
-  ignore_workspaces: boolean,  -- hide workspace entries, default: false
-  ignore_tabs: boolean,        -- hide tab entries, default: false
-  ignore_windows: boolean,     -- hide window entries, default: false
-  fmt_window: fmt_fun,         -- format function for window state name (wezterm.format)
-  fmt_workspace: fmt_fun,      -- format function for workspace state name
-  fmt_tab: fmt_fun,            -- format function for tab state name
-  fmt_date: fmt_fun,           -- format function for date
-  show_state_with_date: boolean, -- show last update of the state file, default: false
-  date_format: string,         -- date formatting, default: "%Y-%m-%d %H:%M"
-  ignore_screen_width: boolean,-- whether to shrink the list if the window is too narrow, default: true
-  name_truncature: string,     -- string used when state name is truncated
-  min_filename_size: number    -- minimum size of state name before truncation
-}
-```
+If you need full control over how each state type is restored, call `fuzzy_load` directly —
+see "Option C" in [`docs/advanced_setup.lua`](docs/advanced_setup.lua) for a complete
+example that dispatches on workspace/window/tab.
 
 ### Deleting state
 
-Delete a saved state file via fuzzy finder:
-
-```lua
-local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
-
-config.keys = {
-  -- ...
-  {
-    key = "d",
-    mods = "ALT",
-    action = resurrect.fuzzy_loader.delete_action(),
-  },
-}
-```
-
-`delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` to customise the picker title, description, etc.
+`delete_action` accepts the same `fuzzy_load_opts` as `fuzzy_load` (see
+[`docs/fuzzy_load_opts.md`](docs/fuzzy_load_opts.md)) to customise the picker title,
+description, etc.
 
 #### Manual dispatch
 
-```lua
-action = wezterm.action_callback(function(win, pane)
-  resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id)
-      resurrect.state_manager.delete_state(id)
-    end,
-    {
-      title = "Delete State",
-      description = "Select State to Delete and press Enter = accept, Esc = cancel, / = filter",
-      fuzzy_description = "Search State to Delete: ",
-      is_fuzzy = true,
-    })
-end),
-```
+For full control over the delete picker (custom title, description, etc.) instead of using
+`delete_action()`, see "Option B" (Delete) in [`docs/advanced_setup.lua`](docs/advanced_setup.lua).
 
 ### Encryption (optional, recommended)
 
@@ -632,32 +414,9 @@ This plugin emits the following events that you can use for your own callback fu
 - `resurrect.workspace_state.restore_workspace.finished`
 - `resurrect.workspace_state.restore_workspace.start`
 
-Example: sending a toast notification when specified events occur, but suppress on `periodic_save()`:
-
-```lua
-local resurrect_event_listeners = {
-  "resurrect.error",
-  "resurrect.file_io.write_state.finished",
-}
-local is_periodic_save = false
-wezterm.on("resurrect.state_manager.periodic_save.start", function()
-  is_periodic_save = true
-end)
-for _, event in ipairs(resurrect_event_listeners) do
-  wezterm.on(event, function(...)
-    if event == "resurrect.file_io.write_state.finished" and is_periodic_save then
-      is_periodic_save = false
-      return
-    end
-    local args = { ... }
-    local msg = event
-    for _, v in ipairs(args) do
-      msg = msg .. " " .. tostring(v)
-    end
-    wezterm.gui.gui_windows()[1]:toast_notification("Wezterm - resurrect", msg, nil, 4000)
-  end)
-end
-```
+See the toast-notification section of [`docs/advanced_setup.lua`](docs/advanced_setup.lua)
+for an example that sends a toast notification on selected events, suppressing the noisy
+`periodic_save()` write-finished event.
 
 ## State files
 

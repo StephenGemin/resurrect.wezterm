@@ -33,3 +33,8 @@ After completing a code change that alters the public API, module structure, or 
 pipeline, update the relevant sections of AGENTS.md (`## Project structure`,
 `## Build and test`) to match. Do not update documentation for internal-only changes
 without explicit approval.
+
+If a change alters restore or workspace-switching behavior relative to the original
+project, update the "Behavioral changes" table in `docs/migrating_from_upstream.md`
+to match — that table is the one place the fork's divergences are enumerated, and it
+silently rots if a new one isn't added there.
