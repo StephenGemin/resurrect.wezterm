@@ -68,9 +68,18 @@ capture_logs() {
 launch() {
 	local run="$1" state="$1/state/" pid sock
 	mkdir -p "$state"
-	# RESURRECT_DEBUG is passed through only when the caller set it, so a bare
-	# `drive.sh start` stays quiet and `RESURRECT_DEBUG=1 drive.sh start` opts into the
-	# plugin's resurrect.debug: firehose (grep it with `drive.sh debuglog`).
+	# RESURRECT_DEBUG must survive `restart`: restart re-enters launch() from a fresh
+	# shell that no longer carries the env var the original `start` was invoked with, yet
+	# the gui-startup restore the firehose exists to trace only runs on that post-restart
+	# process. Persist the opt-in into the run dir on first sight and reload it here, so
+	# `RESURRECT_DEBUG=1 drive.sh start` keeps emitting across restarts while a bare
+	# `start` stays quiet (no flag file -> nothing to reload).
+	local debug_flag="$run/resurrect-debug.on"
+	if [ -n "${RESURRECT_DEBUG:-}" ]; then
+		printf '%s' "$RESURRECT_DEBUG" >"$debug_flag"
+	elif [ -f "$debug_flag" ]; then
+		RESURRECT_DEBUG="$(cat "$debug_flag")"
+	fi
 	# `env` is required, not decorative: bash recognizes assignment prefixes at parse
 	# time, so the `${RESURRECT_DEBUG:+VAR=val}` word (which only looks like an assignment
 	# after expansion) would be run as a command named `RESURRECT_DEBUG=1` -> "command not
