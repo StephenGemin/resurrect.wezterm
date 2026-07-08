@@ -144,7 +144,7 @@ generate_report() {
 		echo
 		echo '```'
 		grep -h -E 'resurrect' "$run"/evidence/wezterm-gui-log-*.txt 2>/dev/null \
-			| grep -E 'gui-startup|restore_baseline|error|skipping|resurrect\.debug' || echo "(no resurrect restore/save lines captured)"
+			| grep -E 'gui-startup|error|skipping|resurrect\.debug' || echo "(no resurrect restore/save lines captured)"
 		echo '```'
 		echo
 		echo "## Saved state summary"
