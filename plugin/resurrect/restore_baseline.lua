@@ -1,5 +1,6 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local utils = require("resurrect.utils")
+local log = require("resurrect.logging")
 
 -- Restored panes replay their saved scrollback via inject_output, and the
 -- restore's trailing "\r\n" makes the live shell print one genuinely new
@@ -75,17 +76,11 @@ function pub.register(pane, text)
 	local ok, rendered = pcall(utils.capture_pane_text, pane, max_nlines)
 	if not ok then
 		_baselines[pane_id] = nil
-		wezterm.log_info(("resurrect.restore_baseline: pane %d register capture failed, not tracking"):format(pane_id))
+		log.debug("register pane=%d decision=not_tracking reason=register_capture_failed", pane_id)
 		return
 	end
 	local rendered_rows = count_rows(rendered)
-	wezterm.log_info(
-		("resurrect.restore_baseline: pane %d registered replay (%d bytes, %d rendered rows)"):format(
-			pane_id,
-			#text,
-			rendered_rows
-		)
-	)
+	log.debug("register pane=%d bytes=%d rendered_rows=%d", pane_id, #text, rendered_rows)
 	wezterm.time.call_after(SETTLE_DELAY_SECONDS, function()
 		if _baselines[pane_id] ~= entry then
 			return
@@ -94,30 +89,22 @@ function pub.register(pane, text)
 		local snap_ok, snapshot = pcall(utils.capture_pane_text, pane, max_nlines)
 		if not snap_ok then
 			_baselines[pane_id] = nil
-			wezterm.log_info(
-				("resurrect.restore_baseline: pane %d settle capture failed, not tracking"):format(pane_id)
-			)
+			log.debug("settle pane=%d decision=not_tracking reason=settle_capture_failed", pane_id)
 			return
 		end
 		local snapshot_rows = count_rows(snapshot)
 		if snapshot_rows > rendered_rows + MAX_SETTLE_GROWTH_ROWS then
 			_baselines[pane_id] = nil
-			wezterm.log_info(
-				("resurrect.restore_baseline: pane %d grew %d->%d rows during settle (activity), not tracking"):format(
-					pane_id,
-					rendered_rows,
-					snapshot_rows
-				)
+			log.debug(
+				"settle pane=%d decision=drop reason=growth_exceeded rendered_rows=%d snapshot_rows=%d",
+				pane_id,
+				rendered_rows,
+				snapshot_rows
 			)
 			return
 		end
 		entry.snapshot = snapshot
-		wezterm.log_info(
-			("resurrect.restore_baseline: pane %d settled (%d rows), idle saves will persist the replay"):format(
-				pane_id,
-				snapshot_rows
-			)
-		)
+		log.debug("settle pane=%d decision=settled rows=%d reason=idle_will_persist", pane_id, snapshot_rows)
 	end)
 end
 
@@ -137,17 +124,15 @@ function pub.text_to_persist(pane, captured)
 	end
 	local pane_id = pane:pane_id()
 	if not entry.snapshot then
-		wezterm.log_info(("resurrect.restore_baseline: pane %d saved before settle, capturing live"):format(pane_id))
+		log.debug("persist pane=%d decision=capture_live reason=saved_before_settle", pane_id)
 		return captured
 	end
 	if captured == entry.snapshot then
-		wezterm.log_info(("resurrect.restore_baseline: pane %d idle, persisting replay"):format(pane_id))
+		log.debug("persist pane=%d decision=persist_replay", pane_id)
 		return entry.text
 	end
 	_baselines[pane_id] = nil
-	wezterm.log_info(
-		("resurrect.restore_baseline: pane %d changed since restore, capturing live from now on"):format(pane_id)
-	)
+	log.debug("persist pane=%d decision=capture_live reason=changed_since_restore", pane_id)
 	return captured
 end
 

@@ -13,6 +13,7 @@ end
 local pub = {}
 
 local function init()
+	pub.logging = require("resurrect.logging")
 	pub.workspace_state = require("resurrect.workspace_state")
 	pub.window_state = require("resurrect.window_state")
 	pub.tab_state = require("resurrect.tab_state")

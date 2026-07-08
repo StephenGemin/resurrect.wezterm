@@ -68,7 +68,23 @@ capture_logs() {
 launch() {
 	local run="$1" state="$1/state/" pid sock
 	mkdir -p "$state"
-	RESURRECT_TEST_STATE_DIR="$state" \
+	# RESURRECT_DEBUG must survive `restart`: restart re-enters launch() from a fresh
+	# shell that no longer carries the env var the original `start` was invoked with, yet
+	# the gui-startup restore the firehose exists to trace only runs on that post-restart
+	# process. Persist the opt-in into the run dir on first sight and reload it here, so
+	# `RESURRECT_DEBUG=1 drive.sh start` keeps emitting across restarts while a bare
+	# `start` stays quiet (no flag file -> nothing to reload).
+	local debug_flag="$run/resurrect-debug.on"
+	if [ -n "${RESURRECT_DEBUG:-}" ]; then
+		printf '%s' "$RESURRECT_DEBUG" >"$debug_flag"
+	elif [ -f "$debug_flag" ]; then
+		RESURRECT_DEBUG="$(cat "$debug_flag")"
+	fi
+	# `env` is required, not decorative: bash recognizes assignment prefixes at parse
+	# time, so the `${RESURRECT_DEBUG:+VAR=val}` word (which only looks like an assignment
+	# after expansion) would be run as a command named `RESURRECT_DEBUG=1` -> "command not
+	# found", and wezterm would never launch. `env` parses VAR=val args itself.
+	env RESURRECT_TEST_STATE_DIR="$state" ${RESURRECT_DEBUG:+RESURRECT_DEBUG="$RESURRECT_DEBUG"} \
 		wezterm --config-file "$CONFIG" start --class "$CLASS" --always-new-process -- zsh -f \
 		>"$run/gui-stdout.log" 2>&1 &
 	pid=$!
@@ -128,7 +144,7 @@ generate_report() {
 		echo
 		echo '```'
 		grep -h -E 'resurrect' "$run"/evidence/wezterm-gui-log-*.txt 2>/dev/null \
-			| grep -E 'gui-startup|restore_baseline|error|skipping' || echo "(no resurrect restore/save lines captured)"
+			| grep -E 'gui-startup|error|skipping|resurrect\.debug' || echo "(no resurrect restore/save lines captured)"
 		echo '```'
 		echo
 		echo "## Saved state summary"
@@ -206,6 +222,19 @@ cli)
 	shift
 	WEZTERM_UNIX_SOCKET="$(sock_for "$(cur_pid)")" wezterm cli "$@"
 	;;
+debuglog)
+	# Grep the plugin's resurrect.debug: firehose out of the current run's LIVE gui log
+	# (fresher than the archived evidence copy). Optional arg is an extended-regex filter,
+	# so an assertion is one line: `drive.sh debuglog 'decision=drop' | grep 'poll=1'`.
+	# Only produces output when the instance was launched with RESURRECT_DEBUG=1.
+	shift
+	log="$HOME/.local/share/wezterm/wezterm-gui-log-$(cur_pid).txt"
+	if [ -n "${1:-}" ]; then
+		grep -h 'resurrect.debug:' "$log" 2>/dev/null | grep -E "$1" || true
+	else
+		grep -h 'resurrect.debug:' "$log" 2>/dev/null || true
+	fi
+	;;
 report)
 	generate_report "$(run_dir)"
 	;;
@@ -221,7 +250,7 @@ stop)
 	echo "archive (ephemeral, under \$TMPDIR): $RUN"
 	;;
 *)
-	echo "usage: $0 {start|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|sock|report|stop}" >&2
+	echo "usage: $0 {start|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|debuglog [regex]|sock|report|stop}" >&2
 	exit 1
 	;;
 esac

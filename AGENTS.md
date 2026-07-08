@@ -29,6 +29,8 @@ plugin/
     restore_baseline.lua     per-pane replayed-text registry + settle-snapshot idle
                              check, so saves don't re-capture (and grow) idle restored panes
     utils.lua                platform detection, string helpers, ensure_folder_exists
+    logging.lua              gated resurrect.debug: diagnostic firehose; off by default,
+                             enable via RESURRECT_DEBUG=1 env or resurrect.logging.set_debug()
     fuzzy_loader.lua         fuzzy-finder UI for picking a saved state to load
 spec/
   spec_helper.lua            shared wezterm mock and module loader for busted specs
