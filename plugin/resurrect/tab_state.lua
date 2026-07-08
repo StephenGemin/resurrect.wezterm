@@ -5,6 +5,31 @@ local pub = {}
 
 local _named_tabs = {} -- {[tab_id: integer] = name: string}
 
+---Total column span of a subtree: its own width plus the width of everything to
+---its right. Bottom-children share their parent's column, so they add no width
+---and are not followed here. Used so a split allocates the whole right subtree
+---its combined width rather than only the immediate child's (chains of
+---horizontal splits would otherwise under-allocate the far side and drift).
+---@param node pane_tree?
+---@return integer
+local function span_width(node)
+	if node == nil then
+		return 0
+	end
+	return node.width + span_width(node.right)
+end
+
+---Total row span of a subtree: its own height plus the height of everything
+---below it. Right-children share their parent's row, so they add no height.
+---@param node pane_tree?
+---@return integer
+local function span_height(node)
+	if node == nil then
+		return 0
+	end
+	return node.height + span_height(node.bottom)
+end
+
 ---Function used to split panes when mapping over the pane_tree
 ---@param opts restore_opts
 ---@return fun(acc: {active_pane: Pane, is_zoomed: boolean}, pane_tree: pane_tree): {active_pane: Pane, is_zoomed: boolean}
@@ -20,28 +45,55 @@ local function make_splits(opts)
 			opts.on_pane_restore(pane_tree)
 		end
 
+		local right = pane_tree.right
 		local bottom = pane_tree.bottom
-		if bottom then
-			local split_args = { direction = "Bottom", cwd = bottom.cwd }
-			if opts.relative then
-				split_args.size = bottom.height / (pane_tree.height + bottom.height)
-			elseif opts.absolute then
-				split_args.size = bottom.height
-			end
 
+		-- Each split allocates the child's whole subtree span, not just the
+		-- immediate child's width/height, so chains of same-direction splits keep
+		-- their proportions instead of the far side drifting narrower each level.
+		local function split_right()
+			local split_args = { direction = "Right", cwd = right.cwd }
+			local right_span = span_width(right)
+			if opts.relative then
+				split_args.size = right_span / (pane_tree.width + right_span)
+			elseif opts.absolute then
+				split_args.size = right_span
+			end
+			right.pane = pane:split(split_args)
+		end
+
+		local function split_bottom()
+			local split_args = { direction = "Bottom", cwd = bottom.cwd }
+			local bottom_span = span_height(bottom)
+			if opts.relative then
+				split_args.size = bottom_span / (pane_tree.height + bottom_span)
+			elseif opts.absolute then
+				split_args.size = bottom_span
+			end
 			bottom.pane = pane:split(split_args)
 		end
 
-		local right = pane_tree.right
-		if right then
-			local split_args = { direction = "Right", cwd = right.cwd }
-			if opts.relative then
-				split_args.size = right.width / (pane_tree.width + right.width)
-			elseif opts.absolute then
-				split_args.size = right.width
+		-- With both children, the split whose subtree spans this node's full
+		-- region -- the guillotine cut that runs edge to edge -- must be made
+		-- first, so the other cut lands inside the remaining piece rather than
+		-- carving across the whole node. The right subtree spans the full height
+		-- exactly when it extends below this node's own cell; otherwise the
+		-- bottom subtree is the full-width band and goes first. A fixed order
+		-- can't satisfy both, because create_pane_tree encodes a 2x2 grid with
+		-- the far corner under either child depending on the exact divider
+		-- coordinates.
+		if right and bottom then
+			if span_height(right) > pane_tree.height then
+				split_right()
+				split_bottom()
+			else
+				split_bottom()
+				split_right()
 			end
-
-			right.pane = pane:split(split_args)
+		elseif right then
+			split_right()
+		elseif bottom then
+			split_bottom()
 		end
 
 		if pane_tree.is_active then
