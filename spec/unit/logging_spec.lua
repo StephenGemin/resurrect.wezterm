@@ -1,4 +1,4 @@
--- Guards the resurrect.logging public contract: set_debug/is_enabled gate debug(), and
+-- Guards the resurrect.logging public contract: set_debug/is_debug_enabled gate debug(), and
 -- debug() emits a "resurrect.debug: " prefixed, formatted line only while enabled.
 --
 -- The RESURRECT_DEBUG env-var-at-load path is intentionally not covered here -- Lua has
@@ -26,7 +26,7 @@ describe("resurrect.logging", function()
 
 		log.debug("pane=%d", 1)
 
-		assert.is_false(log.is_enabled())
+		assert.is_false(log.is_debug_enabled())
 		assert.are.equal(0, #logs)
 	end)
 
@@ -36,7 +36,7 @@ describe("resurrect.logging", function()
 
 		log.debug("pane=%d bytes=%d", 7, 42)
 
-		assert.is_true(log.is_enabled())
+		assert.is_true(log.is_debug_enabled())
 		assert.are.equal(1, #logs)
 		assert.are.equal("resurrect.debug: pane=7 bytes=42", logs[1])
 	end)
@@ -48,7 +48,7 @@ describe("resurrect.logging", function()
 
 		log.debug("pane=%d", 1)
 
-		assert.is_false(log.is_enabled())
+		assert.is_false(log.is_debug_enabled())
 		assert.are.equal(0, #logs)
 	end)
 
@@ -57,6 +57,6 @@ describe("resurrect.logging", function()
 
 		log.set_debug("1")
 
-		assert.is_false(log.is_enabled())
+		assert.is_false(log.is_debug_enabled())
 	end)
 end)

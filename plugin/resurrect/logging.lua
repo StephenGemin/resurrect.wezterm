@@ -9,32 +9,32 @@ local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes 
 --     mid-session. Plugin modules are cached in-process, so the env var is frozen at
 --     gui-process start; only a setter can flip the firehose without a full wezterm restart.
 --
--- `enabled` is a private local mutated solely through set_debug(), never an exposed mutable
--- field, so nothing else can reach in and toggle it by assignment.
-local enabled = os.getenv("RESURRECT_DEBUG") == "1"
+-- `is_debug_enabled` is a private local mutated solely through set_debug(), never an exposed
+-- mutable field, so nothing else can reach in and toggle it by assignment.
+local is_debug_enabled = os.getenv("RESURRECT_DEBUG") == "1"
 
 local pub = {}
 
 ---Enable or disable the debug firehose at runtime (e.g. from the F12 debug overlay).
 ---@param on boolean
 function pub.set_debug(on)
-	enabled = on == true
+	is_debug_enabled = on == true
 end
 
 ---Whether the firehose is on. Guard eager arguments with this -- Lua evaluates a call's
 ---arguments before the call, so any mux-heavy or string-building argument must be wrapped
----`if log.is_enabled() then log.debug(...) end` rather than passed straight to debug()
+---`if log.is_debug_enabled() then log.debug(...) end` rather than passed straight to debug()
 ---(consumers alias this module `local log = require("resurrect.logging")`).
 ---@return boolean
-function pub.is_enabled()
-	return enabled
+function pub.is_debug_enabled()
+	return is_debug_enabled
 end
 
 ---Emit one diagnostic line, prefixed "resurrect.debug:", only when enabled.
 ---@param fmt string
 ---@param ... any
 function pub.debug(fmt, ...)
-	if enabled then
+	if is_debug_enabled then
 		wezterm.log_info("resurrect.debug: " .. fmt:format(...))
 	end
 end
