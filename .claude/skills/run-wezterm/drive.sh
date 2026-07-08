@@ -71,7 +71,11 @@ launch() {
 	# RESURRECT_DEBUG is passed through only when the caller set it, so a bare
 	# `drive.sh start` stays quiet and `RESURRECT_DEBUG=1 drive.sh start` opts into the
 	# plugin's resurrect.debug: firehose (grep it with `drive.sh debuglog`).
-	RESURRECT_TEST_STATE_DIR="$state" ${RESURRECT_DEBUG:+RESURRECT_DEBUG="$RESURRECT_DEBUG"} \
+	# `env` is required, not decorative: bash recognizes assignment prefixes at parse
+	# time, so the `${RESURRECT_DEBUG:+VAR=val}` word (which only looks like an assignment
+	# after expansion) would be run as a command named `RESURRECT_DEBUG=1` -> "command not
+	# found", and wezterm would never launch. `env` parses VAR=val args itself.
+	env RESURRECT_TEST_STATE_DIR="$state" ${RESURRECT_DEBUG:+RESURRECT_DEBUG="$RESURRECT_DEBUG"} \
 		wezterm --config-file "$CONFIG" start --class "$CLASS" --always-new-process -- zsh -f \
 		>"$run/gui-stdout.log" 2>&1 &
 	pid=$!
