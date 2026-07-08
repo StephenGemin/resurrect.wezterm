@@ -1,6 +1,7 @@
 local wezterm = require("wezterm") --[[@as Wezterm]] --- this type cast invokes the LSP module for Wezterm
 local pane_tree_mod = require("resurrect.pane_tree")
 local state_manager_mod = require("resurrect.state_manager")
+local log = require("resurrect.logging")
 local pub = {}
 
 local _named_tabs = {} -- {[tab_id: integer] = name: string}
@@ -40,6 +41,14 @@ local function make_splits(opts)
 
 	return function(acc, pane_tree)
 		local pane = pane_tree.pane
+		-- Guarded: a fresh pane:pane_id() call is a mux round trip, and Lua
+		-- evaluates log.debug's arguments eagerly even when logging is off, so
+		-- this must not run unconditionally (unlike restore_baseline.lua's calls,
+		-- which reuse a pane_id already needed for its own tracking table).
+		local pane_id
+		if log.is_debug_enabled() then
+			pane_id = pane:pane_id()
+		end
 
 		if opts.on_pane_restore then
 			opts.on_pane_restore(pane_tree)
@@ -48,28 +57,63 @@ local function make_splits(opts)
 		local right = pane_tree.right
 		local bottom = pane_tree.bottom
 
+		log.debug(
+			"make_splits node=%d want=%dx%d @%d,%d has_right=%d has_bottom=%d",
+			pane_id,
+			pane_tree.width,
+			pane_tree.height,
+			pane_tree.left,
+			pane_tree.top,
+			right and 1 or 0,
+			bottom and 1 or 0
+		)
+
 		-- Each split allocates the child's whole subtree span, not just the
 		-- immediate child's width/height, so chains of same-direction splits keep
 		-- their proportions instead of the far side drifting narrower each level.
 		local function split_right()
 			local split_args = { direction = "Right", cwd = right.cwd }
 			local right_span = span_width(right)
+			local mode = "none"
 			if opts.relative then
 				split_args.size = right_span / (pane_tree.width + right_span)
+				mode = "relative"
 			elseif opts.absolute then
 				split_args.size = right_span
+				mode = "absolute"
 			end
+			log.debug(
+				"split node=%d dir=Right child_span=%d immediate_child=%d node_dim=%d mode=%s size=%s",
+				pane_id,
+				right_span,
+				right.width,
+				pane_tree.width,
+				mode,
+				tostring(split_args.size)
+			)
 			right.pane = pane:split(split_args)
 		end
 
 		local function split_bottom()
 			local split_args = { direction = "Bottom", cwd = bottom.cwd }
 			local bottom_span = span_height(bottom)
+			local mode = "none"
 			if opts.relative then
 				split_args.size = bottom_span / (pane_tree.height + bottom_span)
+				mode = "relative"
 			elseif opts.absolute then
 				split_args.size = bottom_span
+				mode = "absolute"
 			end
+			log.debug(
+				"split node=%d dir=Bottom child_span=%d immediate_child=%d node_dim=%d mode=%s size=%s",
+				pane_id,
+				bottom_span,
+				bottom.height,
+				pane_tree.height,
+				mode,
+				tostring(split_args.size)
+			)
 			bottom.pane = pane:split(split_args)
 		end
 
@@ -83,7 +127,15 @@ local function make_splits(opts)
 		-- the far corner under either child depending on the exact divider
 		-- coordinates.
 		if right and bottom then
-			if span_height(right) > pane_tree.height then
+			local right_first = span_height(right) > pane_tree.height
+			log.debug(
+				"make_splits node=%d order=%s right_span_h=%d node_h=%d",
+				pane_id,
+				right_first and "right_first" or "bottom_first",
+				span_height(right),
+				pane_tree.height
+			)
+			if right_first then
 				split_right()
 				split_bottom()
 			else
@@ -184,6 +236,29 @@ function pub.restore_tab(tab, tab_state, opts)
 		end
 
 		local acc = pane_tree_mod.fold(tab_state.pane_tree, { is_zoomed = false }, make_splits(opts))
+
+		-- Sampled once here, after every split in the tree has landed -- not inline
+		-- in make_splits right after each pane:split() call, where a pane that gets
+		-- carved again later (e.g. the right child of a two-child node, before its
+		-- own bottom split runs) still reports its pre-carve size and would log a
+		-- false want/got mismatch.
+		if log.is_debug_enabled() then
+			pane_tree_mod.map(tab_state.pane_tree, function(node)
+				if node.pane then
+					local dims = node.pane:get_dimensions()
+					log.debug(
+						"split_done node=%d want=%dx%d got=%dx%d",
+						node.pane:pane_id(),
+						node.width,
+						node.height,
+						dims.cols,
+						dims.viewport_rows
+					)
+				end
+				return node
+			end)
+		end
+
 		-- acc.active_pane is only set if some node in the saved tree has is_active
 		-- true; a malformed or hand-edited state file can omit that, which would
 		-- otherwise crash the whole restore here.
