@@ -80,12 +80,23 @@ launch() {
 	elif [ -f "$debug_flag" ]; then
 		RESURRECT_DEBUG="$(cat "$debug_flag")"
 	fi
+	# Prompt-integration mode (opt-in via `start --prompt-integration`) is persisted
+	# to the run dir so `restart` re-launches into the same shell: the gui-startup
+	# restore has to land in the same prompt environment it was saved from. The path
+	# is exported as ZDOTDIR to test-config.lua, which turns it into default_prog so
+	# BOTH the initial and the restored panes load the fixture (they must match).
+	local zdotdir_flag="$run/prompt-integration.zdotdir" zdotdir=""
+	[ -f "$zdotdir_flag" ] && zdotdir="$(cat "$zdotdir_flag")"
 	# `env` is required, not decorative: bash recognizes assignment prefixes at parse
 	# time, so the `${RESURRECT_DEBUG:+VAR=val}` word (which only looks like an assignment
 	# after expansion) would be run as a command named `RESURRECT_DEBUG=1` -> "command not
-	# found", and wezterm would never launch. `env` parses VAR=val args itself.
-	env RESURRECT_TEST_STATE_DIR="$state" ${RESURRECT_DEBUG:+RESURRECT_DEBUG="$RESURRECT_DEBUG"} \
-		wezterm --config-file "$CONFIG" start --class "$CLASS" --always-new-process -- zsh -f \
+	# found", and wezterm would never launch. `env` parses VAR=val args itself. The shell
+	# is chosen by test-config.lua (default_prog), not with a `-- prog` arg here, so the
+	# initial and restored panes stay on the same shell.
+	env RESURRECT_TEST_STATE_DIR="$state" \
+		${RESURRECT_DEBUG:+RESURRECT_DEBUG="$RESURRECT_DEBUG"} \
+		${zdotdir:+RESURRECT_TEST_ZDOTDIR="$zdotdir"} \
+		wezterm --config-file "$CONFIG" start --class "$CLASS" --always-new-process \
 		>"$run/gui-stdout.log" 2>&1 &
 	pid=$!
 	echo "$pid" >>"$run/pids.txt"
@@ -171,11 +182,16 @@ generate_report() {
 
 case "${1:-}" in
 start)
+	shift
+	prompt_integration=""
+	[ "${1:-}" = "--prompt-integration" ] && { prompt_integration=1; shift; }
 	copy_plugin
 	RUN="$RUNS_ROOT/$(date +%Y%m%d-%H%M%S)"
 	mkdir -p "$RUN/evidence"
 	echo "$RUN" >"$CURRENT"
 	ln -sfn "$RUN" "$RUNS_ROOT/latest"
+	# Persist the opt-in shell fixture so restart (which re-enters launch) reuses it.
+	[ -n "$prompt_integration" ] && printf '%s' "$SCRIPT_DIR/fixtures/prompt-integration" >"$RUN/prompt-integration.zdotdir"
 	{
 		echo "run:        $(basename "$RUN")"
 		echo "date:       $(date '+%Y-%m-%d %H:%M:%S')"
@@ -250,7 +266,7 @@ stop)
 	echo "archive (ephemeral, under \$TMPDIR): $RUN"
 	;;
 *)
-	echo "usage: $0 {start|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|debuglog [regex]|sock|report|stop}" >&2
+	echo "usage: $0 {start [--prompt-integration]|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|debuglog [regex]|sock|report|stop}" >&2
 	exit 1
 	;;
 esac

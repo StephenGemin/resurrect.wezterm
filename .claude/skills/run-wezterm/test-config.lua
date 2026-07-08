@@ -13,6 +13,21 @@ local config = wezterm.config_builder()
 
 config.check_for_updates = false
 
+-- Shell for the test panes. Default is `zsh -f`: no rc files, fully isolated and
+-- deterministic. When drive.sh is started with --prompt-integration it exports
+-- RESURRECT_TEST_ZDOTDIR pointing at a committed prompt fixture; we then load
+-- that fixture as the rc (via ZDOTDIR) so panes get OSC 133 prompt integration --
+-- needed to reproduce prompt-replay / restore-fidelity bugs that a bare prompt
+-- cannot show. Choosing the shell here (not via drive.sh's launch arg) keeps the
+-- initial and restored panes on the SAME shell, which restore fidelity requires.
+local zdotdir = os.getenv("RESURRECT_TEST_ZDOTDIR")
+if zdotdir and zdotdir ~= "" then
+	config.set_environment_variables = { ZDOTDIR = zdotdir }
+	config.default_prog = { "zsh", "-i", "-d" }
+else
+	config.default_prog = { "zsh", "-f" }
+end
+
 local resurrect = wezterm.plugin.require("https://github.com/StephenGemin/resurrect.wezterm")
 
 local state_dir = os.getenv("RESURRECT_TEST_STATE_DIR")

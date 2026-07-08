@@ -25,6 +25,7 @@ instance you MUST point `WEZTERM_UNIX_SOCKET` at its own `gui-sock-<pid>`.
 cd .claude/skills/run-wezterm
 ./drive.sh start            # copies plugin/ into the cache, opens a fresh run archive,
                             # launches isolated gui, prints pid / socket / gui-log / run-dir
+./drive.sh start --prompt-integration  # same, but panes run a prompt with OSC 133 marks (see below)
 ./drive.sh cli list         # run any `wezterm cli` subcommand against ONLY the test instance
 ./drive.sh snapshot <label> # capture cli-list + gui-log into the run archive at a named point
 ./drive.sh restart          # kill + relaunch -> fires gui-startup restore from saved state
@@ -44,6 +45,30 @@ Every run gets an **ephemeral archive** under `$TMPDIR` (auto-reaped by the OS �
 no manual cleanup) at `…/resurrect-wezterm-debug/runs/<timestamp>/`, symlinked as
 `runs/latest`. It holds the saved state JSON, per-pid gui-log copies, `cli list`
 snapshots, the uncommitted diff under test, and the generated `report.md`.
+
+## Prompt-integration mode (`start --prompt-integration`)
+
+By default the test panes run `zsh -f` — no rc files, no prompt, fully deterministic.
+That is the right shell for most layout/restore checks, but it **cannot reproduce bugs
+that only surface with a real prompt**: shell-integration (OSC 133) marks, transient
+prompts, and the trailing-prompt-replay class of restore-fidelity bug.
+
+`start --prompt-integration` swaps the shell for `zsh -i -d` with `ZDOTDIR` pointed at a
+committed fixture (`fixtures/prompt-integration/.zshrc`). The fixture emits the standard
+OSC 133 marks plus a fixed two-line prompt — a `pi-path` info line and a `pi> ` input
+line — so every dev on every machine saves and restores a **byte-identical** layout:
+
+- `-i` (interactive) so zsh actually reads the fixture rc; `-d` (`NO_GLOBAL_RCS`) so a
+  machine's `/etc/zsh*` files can't perturb the prompt across boxes.
+- The shell is chosen in `test-config.lua` via `default_prog` (keyed on the
+  `RESURRECT_TEST_ZDOTDIR` env var `drive.sh` exports), **not** by a `drive.sh` launch
+  arg — so the initial AND the restored panes stay on the same shell, which restore
+  fidelity requires. The flag is persisted into the run dir so `restart` relaunches into
+  the same prompt environment it was saved from.
+
+Grep `pi-path` to count prompt blocks and the reverse-video `%` to catch a partial-line
+replay artifact. Use this mode whenever the bug involves the prompt itself; use the bare
+default for everything else.
 
 ## A full round trip (what to actually do)
 
