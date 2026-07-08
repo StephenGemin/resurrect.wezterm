@@ -30,6 +30,7 @@ cd .claude/skills/run-wezterm
 ./drive.sh restart          # kill + relaunch -> fires gui-startup restore from saved state
 ./drive.sh restore <ws>     # headless fuzzy-restore <ws> into the LIVE instance (no picker)
 ./drive.sh delete <ws>      # headless fuzzy-delete <ws>'s saved state (no picker)
+./drive.sh debuglog [regex] # grep the plugin's resurrect.debug: firehose (RESURRECT_DEBUG runs)
 ./drive.sh report           # (re)generate report.md from the archive; prints its path
 ./drive.sh stop             # snapshot + report, kill the gui, `git checkout -- .` the cache
 ```
@@ -109,8 +110,8 @@ Call `report` any time to regenerate after editing `verdict.md`.
 ## Reading evidence
 
 - **gui log**: `~/.local/share/wezterm/wezterm-gui-log-<pid>.txt` (one per gui;
-  `start`/`restart` print the path). Restore verdicts are prefixed
-  `resurrect.restore_baseline:`.
+  `start`/`restart` print the path). Save/restore settle decisions are prefixed
+  `resurrect.debug:` and only appear on a `RESURRECT_DEBUG=1` run (see Debug logging).
 - **saved JSON**: `$STATE/{workspace,window,tab}/*.json`. Pane text lives under
   `window_states[].tabs[].pane_tree(.left/.right).text`. Compare captured text with:
   ```sh
@@ -119,6 +120,30 @@ Call `report` any time to regenerate after editing `verdict.md`.
 - **`current_state`**: `$STATE/current_state` holds the workspace name + type that
   `gui-startup` restore will load. No file = "skipping startup restore" (expected
   on a fresh instance before the first save).
+
+## Debug logging (`resurrect.debug:` firehose)
+
+The plugin has a gated diagnostic firehose for the internal-only signal nothing external
+exposes — chiefly the restore settle/replay decisions in `restore_baseline.lua` (idle vs.
+active, whether the replay is persisted or captured live). It is **off by default**. Turn it on
+for a run by exporting the env var before `start`:
+
+```sh
+RESURRECT_DEBUG=1 ./drive.sh start      # this instance emits resurrect.debug: lines
+./drive.sh debuglog                     # print them all from the live gui log
+./drive.sh debuglog 'decision=drop'     # filter by field (extended regex)
+```
+
+Lines are single-line `key=value`, event token first, so you assert on a field in one pipe:
+
+```sh
+./drive.sh debuglog 'decision=drop' | grep 'poll=1' && echo "REGRESSION" || echo "ok"
+```
+
+A bare `./drive.sh start` (no env var) stays quiet — no firehose. The report's restore-evidence
+block includes `resurrect.debug:` lines when present. To flip it on mid-session instead, run
+`require("resurrect.logging").set_debug(true)` in the F12 debug overlay (an env var is frozen at
+gui-process start; the setter mutates the cached module live).
 
 ## Gotchas verified the hard way
 

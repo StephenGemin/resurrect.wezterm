@@ -68,7 +68,10 @@ capture_logs() {
 launch() {
 	local run="$1" state="$1/state/" pid sock
 	mkdir -p "$state"
-	RESURRECT_TEST_STATE_DIR="$state" \
+	# RESURRECT_DEBUG is passed through only when the caller set it, so a bare
+	# `drive.sh start` stays quiet and `RESURRECT_DEBUG=1 drive.sh start` opts into the
+	# plugin's resurrect.debug: firehose (grep it with `drive.sh debuglog`).
+	RESURRECT_TEST_STATE_DIR="$state" ${RESURRECT_DEBUG:+RESURRECT_DEBUG="$RESURRECT_DEBUG"} \
 		wezterm --config-file "$CONFIG" start --class "$CLASS" --always-new-process -- zsh -f \
 		>"$run/gui-stdout.log" 2>&1 &
 	pid=$!
@@ -128,7 +131,7 @@ generate_report() {
 		echo
 		echo '```'
 		grep -h -E 'resurrect' "$run"/evidence/wezterm-gui-log-*.txt 2>/dev/null \
-			| grep -E 'gui-startup|restore_baseline|error|skipping' || echo "(no resurrect restore/save lines captured)"
+			| grep -E 'gui-startup|restore_baseline|error|skipping|resurrect\.debug' || echo "(no resurrect restore/save lines captured)"
 		echo '```'
 		echo
 		echo "## Saved state summary"
@@ -206,6 +209,19 @@ cli)
 	shift
 	WEZTERM_UNIX_SOCKET="$(sock_for "$(cur_pid)")" wezterm cli "$@"
 	;;
+debuglog)
+	# Grep the plugin's resurrect.debug: firehose out of the current run's LIVE gui log
+	# (fresher than the archived evidence copy). Optional arg is an extended-regex filter,
+	# so an assertion is one line: `drive.sh debuglog 'decision=drop' | grep 'poll=1'`.
+	# Only produces output when the instance was launched with RESURRECT_DEBUG=1.
+	shift
+	log="$HOME/.local/share/wezterm/wezterm-gui-log-$(cur_pid).txt"
+	if [ -n "${1:-}" ]; then
+		grep -h 'resurrect.debug:' "$log" 2>/dev/null | grep -E "$1" || true
+	else
+		grep -h 'resurrect.debug:' "$log" 2>/dev/null || true
+	fi
+	;;
 report)
 	generate_report "$(run_dir)"
 	;;
@@ -221,7 +237,7 @@ stop)
 	echo "archive (ephemeral, under \$TMPDIR): $RUN"
 	;;
 *)
-	echo "usage: $0 {start|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|sock|report|stop}" >&2
+	echo "usage: $0 {start|snapshot [label]|restart|restore <ws>|delete <ws>|cli <args>|debuglog [regex]|sock|report|stop}" >&2
 	exit 1
 	;;
 esac
