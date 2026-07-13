@@ -120,7 +120,8 @@ local function insert_choices(stdout, opts)
 	local types = { "workspace", "window", "tab" }
 	local files = { workspace = {}, window = {}, tab = {} }
 
-	for line in stdout:gmatch("[^\n]+") do
+	-- on Windows a producer may emit a line ending as CRLF
+	for line in stdout:gmatch("[^\r\n]+") do
 		local epoch, type, file = line:match("%s*(%d+)%s+.+[/\\]([^/\\]+)[/\\]([^/\\]+%.json)$")
 		if epoch and type and file and files[type] and not opts[string.format("ignore_%ss", type)] then
 			table.insert(files[type], {
