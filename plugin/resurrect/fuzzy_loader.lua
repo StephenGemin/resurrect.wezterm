@@ -65,7 +65,8 @@ local function find_json_files_recursive(base_path)
 		local ps_cmd = string.format(
 			"Get-ChildItem -Path '%s' -Recurse -Filter '*.json' -File | "
 				.. "ForEach-Object { "
-				.. "([int][double]::Parse(($_.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds)).ToString() + ' ' + $_.FullName }",
+				.. "[int][double]::Parse(($_.LastWriteTimeUtc - [datetime]'1970-01-01').TotalSeconds) "
+				.. ".ToString() + ' ' + $_.FullName }",
 			base_path:gsub("'", "''")
 		)
 		success, stdout, stderr = wezterm.run_child_process({
