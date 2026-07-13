@@ -29,7 +29,7 @@ plugin/
     restore_baseline.lua     per-pane replayed-text registry + settle-snapshot idle
                              check, so saves don't re-capture (and grow) idle restored panes
     utils.lua                platform detection, string helpers, ensure_folder_exists
-    logging.lua              gated resurrect.debug: diagnostic firehose; off by default,
+    logging.lua              gated resurrect.debug: diagnostic logging; off by default,
                              enable via RESURRECT_DEBUG=1 env or resurrect.logging.set_debug()
     fuzzy_loader.lua         fuzzy-finder UI for picking a saved state to load
 spec/
@@ -37,6 +37,8 @@ spec/
   unit/                      unit tests (busted --run=unit)
   integration/               integration tests; require lunajson (busted --run=integration)
 scripts/
+  gui-driver/                live-debug driver: launches a real wezterm-gui, drives it via
+                             `wezterm cli`, archives evidence (see gui-driver/README.md)
   migrate-from-mlflexer.sh   copies old MLFlexer state files into this fork's default dir
                              (macOS, Linux, Windows via Git Bash)
 README.md
@@ -81,18 +83,14 @@ busted                          # default: same as --run=unit
 # described in README.md and verify state round-trips correctly.
 ```
 
-### Live-debugging a real WezTerm (`run-wezterm` skill)
+### Live-debugging a real WezTerm (`scripts/gui-driver/`)
 
-Unit tests run against a `wezterm` mock. To exercise uncommitted `plugin/`
-changes in a real wezterm-gui — a genuine save → restart → restore round trip —
-use the project skill at `.claude/skills/run-wezterm/` (invoke via `/run-wezterm`
-or `/run`). It launches a throwaway, isolated gui, copies your local `plugin/`
-into the wezterm plugin cache, drives it with `wezterm cli`, and archives each
-run's evidence (state JSON, gui-log snippets, the diff under test) into an
-ephemeral `$TMPDIR` report. It targets the test instance by its per-process mux
-socket (not `--class`, which does not isolate) and redirects saves to a scratch
-dir so it never touches your real saved state. See the skill's `SKILL.md` for the
-full workflow.
+`scripts/gui-driver` exercises the plugin against a wezterm-gui
+
+- **When:** to confirm save/restore behavior end-to-end
+- **Run:** `scripts/gui-driver/drive.sh` — read `scripts/gui-driver/README.md` for the workflow and commands
+- **Output:** each run archives its evidence into an ephemeral `$TMPDIR` report
+- **Safe:** each run is throwaway and isolated
 
 CI (`.github/workflows/ci.yml`) has three jobs that must stay green on every PR:
 
