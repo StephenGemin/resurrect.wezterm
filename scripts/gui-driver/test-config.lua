@@ -36,7 +36,7 @@ resurrect.setup(config, {
 -- an InputSelector). `drive.sh restore <ws>` / `delete <ws>` make the shell emit
 -- an OSC SetUserVar, which fires user-var-changed. This calls the SAME public API
 -- fuzzy_loader.restore_action / delete_action call — it bypasses the picker UI, it
--- does NOT ship in the plugin. See SKILL.md "Driving the picker flows".
+-- does NOT ship in the plugin. See README.md "Driving the picker flows".
 wezterm.on("user-var-changed", function(_window, _pane, name, value)
 	if name == "resurrect_test_restore" then
 		-- Mirror restore_action's workspace restorer: no window in opts, so

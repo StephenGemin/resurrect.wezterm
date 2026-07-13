@@ -1,10 +1,3 @@
--- Guards the resurrect.logging public contract: set_debug/is_debug_enabled gate debug(), and
--- debug() emits a "resurrect.debug: " prefixed, formatted line only while enabled.
---
--- The RESURRECT_DEBUG env-var-at-load path is intentionally not covered here -- Lua has
--- no portable os.setenv, so exercising it would require forking a subprocess per case.
--- That path is already verified end-to-end by the run-wezterm skill's live restart test.
-
 local helper = require("spec_helper")
 
 describe("resurrect.logging", function()

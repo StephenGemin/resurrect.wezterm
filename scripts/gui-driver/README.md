@@ -1,11 +1,6 @@
----
-name: run-wezterm
-description: Launch and drive a throwaway, isolated wezterm-gui instance to live-test uncommitted resurrect.wezterm plugin changes end-to-end. Use when asked to run, start, drive, or verify the plugin in a real WezTerm (a save → restart → restore round trip), not just via unit tests. Copies local plugin/ changes into the wezterm plugin cache, drives the instance with `wezterm cli`, and reads saved JSON + gui logs back as evidence.
----
+# gui-driver: live-debug resurrect.wezterm in a real WezTerm
 
-# run-wezterm: live-debug resurrect.wezterm in a real WezTerm
-
-Unit tests run the plugin under a `wezterm` mock. This skill runs the **real**
+Unit tests run the plugin under a `wezterm` mock. This tool runs the **real**
 plugin inside a **real** wezterm-gui, so you can verify a genuine
 save → restart → restore round trip. Everything here was verified against
 `wezterm 20240203-110809-5046fc22`.
@@ -22,7 +17,7 @@ instance you MUST point `WEZTERM_UNIX_SOCKET` at its own `gui-sock-<pid>`.
 ## Quick start (use the driver)
 
 ```sh
-cd .claude/skills/run-wezterm
+cd scripts/gui-driver
 ./drive.sh start            # copies plugin/ into the cache, opens a fresh run archive,
                             # launches isolated gui, prints pid / socket / gui-log / run-dir
 ./drive.sh cli list         # run any `wezterm cli` subcommand against ONLY the test instance
@@ -30,7 +25,7 @@ cd .claude/skills/run-wezterm
 ./drive.sh restart          # kill + relaunch -> fires gui-startup restore from saved state
 ./drive.sh restore <ws>     # headless fuzzy-restore <ws> into the LIVE instance (no picker)
 ./drive.sh delete <ws>      # headless fuzzy-delete <ws>'s saved state (no picker)
-./drive.sh debuglog [regex] # grep the plugin's resurrect.debug: firehose (RESURRECT_DEBUG runs)
+./drive.sh debuglog [regex] # grep the plugin's resurrect.debug: log lines (RESURRECT_DEBUG runs)
 ./drive.sh report           # (re)generate report.md from the archive; prints its path
 ./drive.sh stop             # snapshot + report, kill the gui, `git checkout -- .` the cache
 ```
@@ -48,7 +43,7 @@ snapshots, the uncommitted diff under test, and the generated `report.md`.
 ## A full round trip (what to actually do)
 
 ```sh
-cd .claude/skills/run-wezterm
+cd scripts/gui-driver
 ./drive.sh start
 RUN=$(readlink "${TMPDIR:-/tmp}/resurrect-wezterm-debug/runs/latest"); STATE="$RUN/state"
 
@@ -88,7 +83,7 @@ A clean pass looks like: each `MARK_*` reappears after `restart`, and the gui lo
 ## The run report
 
 `stop` (and `report`) writes `report.md` into the run archive and prints its path
-— that path is the skill's final output; hand it to the user. The report has a
+— that path is this tool's final output; hand it to the user. The report has a
 fixed shape so runs read the same every time:
 
 - **Verdict & reasoning** — folded verbatim from `$RUN/verdict.md`, which YOU
@@ -121,9 +116,9 @@ Call `report` any time to regenerate after editing `verdict.md`.
   `gui-startup` restore will load. No file = "skipping startup restore" (expected
   on a fresh instance before the first save).
 
-## Debug logging (`resurrect.debug:` firehose)
+## Debug logging (`resurrect.debug:`)
 
-The plugin has a gated diagnostic firehose for the internal-only signal nothing external
+The plugin has a gated diagnostic log for the internal-only signal nothing external
 exposes — chiefly the restore settle/replay decisions in `restore_baseline.lua` (idle vs.
 active, whether the replay is persisted or captured live). It is **off by default**. Turn it on
 for a run by exporting the env var before `start`:
@@ -140,7 +135,7 @@ Lines are single-line `key=value`, event token first, so you assert on a field i
 ./drive.sh debuglog 'decision=drop' | grep 'poll=1' && echo "REGRESSION" || echo "ok"
 ```
 
-A bare `./drive.sh start` (no env var) stays quiet — no firehose. The report's restore-evidence
+A bare `./drive.sh start` (no env var) stays quiet — no debug output. The report's restore-evidence
 block includes `resurrect.debug:` lines when present. To flip it on mid-session instead, run
 `require("resurrect.logging").set_debug(true)` in the F12 debug overlay (an env var is frozen at
 gui-process start; the setter mutates the cached module live).
@@ -211,7 +206,7 @@ touched. What to know when using it:
 - This bypasses the fuzzy finder; it does **not** test it. The filtering / selection /
   rendering UI glue is out of scope here — cover that with a targeted unit test, not by
   driving the overlay.
-- Hook scope is **workspace** restore/delete (the skill's round-trip unit). Window/tab
+- Hook scope is **workspace** restore/delete (this tool's round-trip unit). Window/tab
   picker restores aren't wired up; add a branch to the hook if a test needs them.
 
 ## Cleanup / safety

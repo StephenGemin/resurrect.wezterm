@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drive a throwaway, isolated wezterm-gui instance to live-test uncommitted
 # resurrect.wezterm changes, archiving every run's evidence and emitting a
-# consistent report. See SKILL.md for the full workflow and rationale.
+# consistent report. See README.md for the full workflow and rationale.
 #
 # Isolation guarantees (verified against wezterm 20240203-110809-5046fc22):
 #   * A dedicated mux SOCKET per instance ($HOME/.local/share/wezterm/gui-sock-<pid>)
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CACHE_DIR="$HOME/Library/Application Support/wezterm/plugins/httpssCssZssZsgithubsDscomsZsStephenGeminsZsresurrectsDswezterm"
 CONFIG="$SCRIPT_DIR/test-config.lua"
 CLASS="resurrect-debug"
@@ -38,7 +38,7 @@ cur_pid()  { local r; r="$(run_dir)"; cat "$r/gui.pid"; }
 
 # Fire the test-config.lua user-var-changed hook by having a pane's shell emit an
 # OSC SetUserVar (base64 value). This drives the plugin's real restore/delete API
-# without the fuzzy picker, which `wezterm cli` cannot navigate. See SKILL.md.
+# without the fuzzy picker, which `wezterm cli` cannot navigate. See README.md.
 emit_uservar() {
 	local name="$1" b64 sock pane
 	b64="$(printf '%s' "$2" | base64)"
@@ -70,7 +70,7 @@ launch() {
 	mkdir -p "$state"
 	# RESURRECT_DEBUG must survive `restart`: restart re-enters launch() from a fresh
 	# shell that no longer carries the env var the original `start` was invoked with, yet
-	# the gui-startup restore the firehose exists to trace only runs on that post-restart
+	# the gui-startup restore the debug logging exists to trace only runs on that post-restart
 	# process. Persist the opt-in into the run dir on first sight and reload it here, so
 	# `RESURRECT_DEBUG=1 drive.sh start` keeps emitting across restarts while a bare
 	# `start` stays quiet (no flag file -> nothing to reload).
@@ -114,7 +114,7 @@ generate_report() {
 	local run="$1" out="$1/report.md"
 	capture_logs "$run"
 	{
-		echo "# run-wezterm report — $(basename "$run")"
+		echo "# gui-driver report — $(basename "$run")"
 		echo
 		echo "_Generated $(date '+%Y-%m-%d %H:%M:%S'). Evidence: \`$run\`_"
 		echo
@@ -223,7 +223,7 @@ cli)
 	WEZTERM_UNIX_SOCKET="$(sock_for "$(cur_pid)")" wezterm cli "$@"
 	;;
 debuglog)
-	# Grep the plugin's resurrect.debug: firehose out of the current run's LIVE gui log
+	# Grep the plugin's resurrect.debug: log lines out of the current run's LIVE gui log
 	# (fresher than the archived evidence copy). Optional arg is an extended-regex filter,
 	# so an assertion is one line: `drive.sh debuglog 'decision=drop' | grep 'poll=1'`.
 	# Only produces output when the instance was launched with RESURRECT_DEBUG=1.
