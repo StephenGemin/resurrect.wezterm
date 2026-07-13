@@ -135,4 +135,16 @@ describe("fuzzy_load: sorting and path parsing", function()
 		assert.equals(1, #choices)
 		assert.equals("workspace" .. sep .. "my project.json", choices[1].id)
 	end)
+
+	it("strips a CRLF line ending instead of emptying the picker", function()
+		local path = FAKE_DIR .. sep .. "workspace" .. sep .. "myproject.json"
+		local fuzzy_loader = setup("1000000000 " .. path .. "\r\n")
+		local window, pane, captured = make_window()
+
+		fuzzy_loader.fuzzy_load(window, pane, function() end, PLAIN_OPTS)
+
+		local choices = captured[1].arg.choices
+		assert.equals(1, #choices)
+		assert.equals("workspace" .. sep .. "myproject.json", choices[1].id)
+	end)
 end)
